@@ -126,19 +126,21 @@ class MainActivity : AppCompatActivity() {
 
     private var currentPhaseIndex: Int = 0
 
-    private val tasks = mutableListOf(
-        Task("Hebamme / KH Konstanz über Hep-B-Status informiert?", false),
-        Task("Kinderkleidung (4 u. 7 J.) für mind. 4 Tage gepackt?", false),
-        Task("Essen für Kinder bei Oma/Opa in Sipplinen organisiert?", false),
-        Task("Transport Kinder nach Hause (ohne Opas Auto) geplant?", false),
-        Task("Hep-B-Impfung für Neugeborenes angemeldet?", false),
-        Task("Wichtige Dokumente im Krankenhaus dabei?", false),
-        Task("Kindergarten/Schule über Abwesenheit informiert?", false),
-        Task("Verwandte/Freunde für Unterstützung kontaktiert?", false),
-        Task("Krankenhaustasche vollständig gepackt?", false),
-        Task("Hörtest für Neugeborenes vor Entlassung?", false),
-        Task("Notfallkontakte auf dem Handy gespeichert?", false),
+    private val defaultTasks = listOf(
+        "Hebamme / KH Konstanz über Hep-B-Status informiert?",
+        "Kinderkleidung (4 u. 7 J.) für mind. 4 Tage gepackt?",
+        "Essen für Kinder bei Oma/Opa in Sipplinen organisiert?",
+        "Transport Kinder nach Hause (ohne Opas Auto) geplant?",
+        "Hep-B-Impfung für Neugeborenes angemeldet?",
+        "Wichtige Dokumente im Krankenhaus dabei?",
+        "Kindergarten/Schule über Abwesenheit informiert?",
+        "Verwandte/Freunde für Unterstützung kontaktiert?",
+        "Krankenhaustasche vollständig gepackt?",
+        "Hörtest für Neugeborenes vor Entlassung?",
+        "Notfallkontakte auf dem Handy gespeichert?",
     )
+
+    private val tasks = mutableListOf<Task>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -153,6 +155,7 @@ class MainActivity : AppCompatActivity() {
         setupKinderInfo()
         setupBetreuung()
         setupHospitalInfo()
+        tasks.addAll(loadTasks())
         setupChecklist()
         setupContacts()
         setupSearch()
@@ -356,20 +359,63 @@ class MainActivity : AppCompatActivity() {
         val checklistLayout = binding.checklistContainer
         checklistLayout.removeAllViews()
 
-        tasks.forEachIndexed { index, task ->
+        tasks.forEach { task ->
             val checkBox = CheckBox(this).apply {
                 text = task.text
                 isChecked = task.done
                 textSize = 14f
                 setPadding(0, 8, 0, 8)
                 setOnCheckedChangeListener { _, isChecked ->
-                    tasks[index] = task.copy(done = isChecked)
-                    updateProgress()
+                    val currentIndex = tasks.indexOf(task)
+                    if (currentIndex >= 0) {
+                        tasks[currentIndex] = task.copy(done = isChecked)
+                        saveTasks()
+                        updateProgress()
+                    }
+                }
+                setOnLongClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Aufgabe löschen?")
+                        .setMessage("\"${task.text}\" entfernen?")
+                        .setPositiveButton("Löschen") { _, _ ->
+                            val currentIndex = tasks.indexOf(task)
+                            if (currentIndex >= 0) tasks.removeAt(currentIndex)
+                            saveTasks()
+                            setupChecklist()
+                        }
+                        .setNegativeButton("Abbrechen", null)
+                        .show()
+                    true
                 }
             }
             checklistLayout.addView(checkBox)
         }
         updateProgress()
+
+        binding.btnAddTask.setOnClickListener { showAddTaskDialog() }
+    }
+
+    private fun showAddTaskDialog() {
+        val editText = EditText(this).apply {
+            hint = "Aufgabe eingeben"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setPadding(48, 24, 48, 24)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("✅ Aufgabe hinzufügen")
+            .setView(editText)
+            .setPositiveButton("Hinzufügen") { _, _ ->
+                val text = editText.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    tasks.add(Task(text, false))
+                    saveTasks()
+                    setupChecklist()
+                } else {
+                    Toast.makeText(this, "Bitte Aufgabe eingeben", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun updateProgress() {
@@ -378,6 +424,38 @@ class MainActivity : AppCompatActivity() {
         binding.tvProgress.text = "$done / $total Aufgaben erledigt"
         binding.progressBar.max = total
         binding.progressBar.progress = done
+    }
+
+    private fun loadTasks(): List<Task> {
+        val prefs = getSharedPreferences("checklist", MODE_PRIVATE)
+        val json = prefs.getString("tasks", null)
+        if (json != null) {
+            return try {
+                val array = JSONArray(json)
+                (0 until array.length()).map { i ->
+                    val obj = array.getJSONObject(i)
+                    Task(obj.getString("text"), obj.getBoolean("done"))
+                }
+            } catch (e: Exception) {
+                Log.e("Checklist", "Failed to load tasks", e)
+                defaultTasks.map { Task(it, false) }
+            }
+        }
+        return defaultTasks.map { Task(it, false) }
+    }
+
+    private fun saveTasks() {
+        val array = JSONArray()
+        tasks.forEach { t ->
+            array.put(JSONObject().apply {
+                put("text", t.text)
+                put("done", t.done)
+            })
+        }
+        getSharedPreferences("checklist", MODE_PRIVATE)
+            .edit()
+            .putString("tasks", array.toString())
+            .apply()
     }
 
     private fun setupContacts() {
