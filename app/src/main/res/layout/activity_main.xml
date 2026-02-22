@@ -255,6 +255,207 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Geburts-Meilensteine Timer Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardMilestones"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_birth">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🏁 Geburts-Meilensteine"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="12dp" />
+
+                <!-- Einleitung -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="10dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🔔 Einleitung"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary_dark" />
+
+                        <Button
+                            android:id="@+id/btnStartEinleitung"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Jetzt"
+                            android:textSize="12sp"
+                            android:backgroundTint="@color/primary_dark" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvEinleitungTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="–"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:paddingTop="2dp" />
+
+                    <TextView
+                        android:id="@+id/tvEinleitungElapsed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary_dark"
+                        android:fontFamily="monospace"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Wehen unregelmäßig -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="10dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🌊 Wehen unregelmäßig"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary_dark" />
+
+                        <Button
+                            android:id="@+id/btnStartWehenUnregel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Jetzt"
+                            android:textSize="12sp"
+                            android:backgroundTint="@color/primary_dark" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvWehenUnregelTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="–"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:paddingTop="2dp" />
+
+                    <TextView
+                        android:id="@+id/tvWehenUnregelElapsed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary_dark"
+                        android:fontFamily="monospace"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Wehen regelmäßig -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="⚡ Wehen regelmäßig"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary_dark" />
+
+                        <Button
+                            android:id="@+id/btnStartWehenRegel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Jetzt"
+                            android:textSize="12sp"
+                            android:backgroundTint="@color/primary_dark" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvWehenRegelTime"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="–"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:paddingTop="2dp" />
+
+                    <TextView
+                        android:id="@+id/tvWehenRegelElapsed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textSize="22sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary_dark"
+                        android:fontFamily="monospace"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Medizinische Info Card (Hep B) -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardMedical"

@@ -89,9 +89,15 @@ class MainActivity : AppCompatActivity() {
         set(Calendar.MILLISECOND, 0)
     }
 
+    // Milestone timer timestamps (0 = not started)
+    private var einleitungStartTime: Long = 0L
+    private var wehenUnregelStartTime: Long = 0L
+    private var wehenRegelStartTime: Long = 0L
+
     private val timerRunnable = object : Runnable {
         override fun run() {
             updateBirthTimer()
+            updateMilestoneTimers()
             handler.postDelayed(this, 1000)
         }
     }
@@ -107,13 +113,13 @@ class MainActivity : AppCompatActivity() {
     private val geburtPhasen: List<GeburtPhase> by lazy {
         listOf(
             GeburtPhase("🌅", "Latenzphase", "Unregelmäßige Wehen – Vorbereitung & Abwarten") { b ->
-                listOf(b.cardTimer, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts)
+                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts)
             },
             GeburtPhase("🌊", "Eröffnungsphase", "Regelmäßige Wehen – Gebärmutterhals öffnet sich") { b ->
-                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts)
+                listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts)
             },
             GeburtPhase("⚡", "Übergangsphase", "Intensive Wehen – kurze Pausen, Fokus halten") { b ->
-                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
+                listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
             },
             GeburtPhase("💪", "Austreibungsphase", "Pressen – Baby kommt!") { b ->
                 listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
@@ -148,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupBirthInfo()
+        setupMilestoneTimers()
         setupMedicalInfo()
         setupGeburtsWuensche()
         setupWehenfoerderung()
@@ -220,6 +227,110 @@ class MainActivity : AppCompatActivity() {
             blasensprungTime - lmpCal.timeInMillis
         ) % 7
         binding.tvSsw.text = "SSW ${weeksDiff}+${daysDiff} (Frühgeburt)"
+    }
+
+    private fun setupMilestoneTimers() {
+        val prefs = getSharedPreferences("milestones", MODE_PRIVATE)
+        einleitungStartTime = prefs.getLong("einleitung", 0L)
+        wehenUnregelStartTime = prefs.getLong("wehen_unregelmaessig", 0L)
+        wehenRegelStartTime = prefs.getLong("wehen_regelmaessig", 0L)
+
+        updateMilestoneTimerRow(
+            einleitungStartTime,
+            binding.tvEinleitungTime,
+            binding.tvEinleitungElapsed
+        )
+        updateMilestoneTimerRow(
+            wehenUnregelStartTime,
+            binding.tvWehenUnregelTime,
+            binding.tvWehenUnregelElapsed
+        )
+        updateMilestoneTimerRow(
+            wehenRegelStartTime,
+            binding.tvWehenRegelTime,
+            binding.tvWehenRegelElapsed
+        )
+
+        binding.btnStartEinleitung.setOnClickListener {
+            showMilestoneStartDialog("Einleitung") { ts ->
+                einleitungStartTime = ts
+                prefs.edit().putLong("einleitung", ts).apply()
+                updateMilestoneTimerRow(ts, binding.tvEinleitungTime, binding.tvEinleitungElapsed)
+            }
+        }
+        binding.btnStartWehenUnregel.setOnClickListener {
+            showMilestoneStartDialog("Wehen unregelmäßig") { ts ->
+                wehenUnregelStartTime = ts
+                prefs.edit().putLong("wehen_unregelmaessig", ts).apply()
+                updateMilestoneTimerRow(ts, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed)
+            }
+        }
+        binding.btnStartWehenRegel.setOnClickListener {
+            showMilestoneStartDialog("Wehen regelmäßig") { ts ->
+                wehenRegelStartTime = ts
+                prefs.edit().putLong("wehen_regelmaessig", ts).apply()
+                updateMilestoneTimerRow(ts, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed)
+            }
+        }
+    }
+
+    private fun showMilestoneStartDialog(label: String, onConfirmed: (Long) -> Unit) {
+        val now = Calendar.getInstance()
+        val options = arrayOf("Jetzt starten", "Uhrzeit wählen", "Zurücksetzen")
+        AlertDialog.Builder(this)
+            .setTitle("$label – Startzeit")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> onConfirmed(System.currentTimeMillis())
+                    1 -> {
+                        TimePickerDialog(
+                            this,
+                            { _, hour, minute ->
+                                val cal = Calendar.getInstance()
+                                cal.set(Calendar.HOUR_OF_DAY, hour)
+                                cal.set(Calendar.MINUTE, minute)
+                                cal.set(Calendar.SECOND, 0)
+                                cal.set(Calendar.MILLISECOND, 0)
+                                if (cal.timeInMillis > System.currentTimeMillis()) {
+                                    cal.add(Calendar.DAY_OF_YEAR, -1)
+                                }
+                                onConfirmed(cal.timeInMillis)
+                            },
+                            now.get(Calendar.HOUR_OF_DAY),
+                            now.get(Calendar.MINUTE),
+                            true
+                        ).show()
+                    }
+                    2 -> onConfirmed(0L)
+                }
+            }
+            .show()
+    }
+
+    private fun updateMilestoneTimerRow(startTime: Long, tvTime: TextView, tvElapsed: TextView) {
+        if (startTime <= 0L) {
+            tvTime.text = "–"
+            tvElapsed.visibility = View.GONE
+            return
+        }
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+        tvTime.text = sdf.format(Date(startTime))
+        tvElapsed.visibility = View.VISIBLE
+        val elapsed = System.currentTimeMillis() - startTime
+        if (elapsed < 0) {
+            tvElapsed.visibility = View.GONE
+            return
+        }
+        val hours = TimeUnit.MILLISECONDS.toHours(elapsed)
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(elapsed) % 60
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(elapsed) % 60
+        tvElapsed.text = String.format(Locale.GERMAN, "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private fun updateMilestoneTimers() {
+        updateMilestoneTimerRow(einleitungStartTime, binding.tvEinleitungTime, binding.tvEinleitungElapsed)
+        updateMilestoneTimerRow(wehenUnregelStartTime, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed)
+        updateMilestoneTimerRow(wehenRegelStartTime, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed)
     }
 
     private fun setupMedicalInfo() {
