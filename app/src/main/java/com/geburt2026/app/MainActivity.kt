@@ -238,38 +238,62 @@ class MainActivity : AppCompatActivity() {
         updateMilestoneTimerRow(
             einleitungStartTime,
             binding.tvEinleitungTime,
-            binding.tvEinleitungElapsed
+            binding.tvEinleitungElapsed,
+            binding.tvEinleitungWarning,
+            warnOrangeHours = EINLEITUNG_WARN_ORANGE_H, warnOrangeText = EINLEITUNG_WARN_ORANGE_TEXT,
+            warnRedHours = EINLEITUNG_WARN_RED_H, warnRedText = EINLEITUNG_WARN_RED_TEXT
         )
         updateMilestoneTimerRow(
             wehenUnregelStartTime,
             binding.tvWehenUnregelTime,
-            binding.tvWehenUnregelElapsed
+            binding.tvWehenUnregelElapsed,
+            binding.tvWehenUnregelWarning,
+            warnOrangeHours = WEHEN_UNREG_WARN_ORANGE_H, warnOrangeText = WEHEN_UNREG_WARN_ORANGE_TEXT,
+            warnRedHours = WEHEN_UNREG_WARN_RED_H, warnRedText = WEHEN_UNREG_WARN_RED_TEXT
         )
         updateMilestoneTimerRow(
             wehenRegelStartTime,
             binding.tvWehenRegelTime,
-            binding.tvWehenRegelElapsed
+            binding.tvWehenRegelElapsed,
+            binding.tvWehenRegelWarning,
+            warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
+            warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
         )
 
         binding.btnStartEinleitung.setOnClickListener {
             showMilestoneStartDialog("Einleitung") { ts ->
                 einleitungStartTime = ts
                 prefs.edit().putLong("einleitung", ts).apply()
-                updateMilestoneTimerRow(ts, binding.tvEinleitungTime, binding.tvEinleitungElapsed)
+                updateMilestoneTimerRow(
+                    ts, binding.tvEinleitungTime, binding.tvEinleitungElapsed,
+                    binding.tvEinleitungWarning,
+                    warnOrangeHours = EINLEITUNG_WARN_ORANGE_H, warnOrangeText = EINLEITUNG_WARN_ORANGE_TEXT,
+                    warnRedHours = EINLEITUNG_WARN_RED_H, warnRedText = EINLEITUNG_WARN_RED_TEXT
+                )
             }
         }
         binding.btnStartWehenUnregel.setOnClickListener {
             showMilestoneStartDialog("Wehen unregelmäßig") { ts ->
                 wehenUnregelStartTime = ts
                 prefs.edit().putLong("wehen_unregelmaessig", ts).apply()
-                updateMilestoneTimerRow(ts, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed)
+                updateMilestoneTimerRow(
+                    ts, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed,
+                    binding.tvWehenUnregelWarning,
+                    warnOrangeHours = WEHEN_UNREG_WARN_ORANGE_H, warnOrangeText = WEHEN_UNREG_WARN_ORANGE_TEXT,
+                    warnRedHours = WEHEN_UNREG_WARN_RED_H, warnRedText = WEHEN_UNREG_WARN_RED_TEXT
+                )
             }
         }
         binding.btnStartWehenRegel.setOnClickListener {
             showMilestoneStartDialog("Wehen regelmäßig") { ts ->
                 wehenRegelStartTime = ts
                 prefs.edit().putLong("wehen_regelmaessig", ts).apply()
-                updateMilestoneTimerRow(ts, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed)
+                updateMilestoneTimerRow(
+                    ts, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed,
+                    binding.tvWehenRegelWarning,
+                    warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
+                    warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
+                )
             }
         }
     }
@@ -307,10 +331,20 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun updateMilestoneTimerRow(startTime: Long, tvTime: TextView, tvElapsed: TextView) {
+    private fun updateMilestoneTimerRow(
+        startTime: Long,
+        tvTime: TextView,
+        tvElapsed: TextView,
+        tvWarning: TextView? = null,
+        warnOrangeHours: Int = -1,
+        warnOrangeText: String = "",
+        warnRedHours: Int = -1,
+        warnRedText: String = ""
+    ) {
         if (startTime <= 0L) {
             tvTime.text = "–"
             tvElapsed.visibility = View.GONE
+            tvWarning?.visibility = View.GONE
             return
         }
         val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
@@ -319,18 +353,56 @@ class MainActivity : AppCompatActivity() {
         val elapsed = System.currentTimeMillis() - startTime
         if (elapsed < 0) {
             tvElapsed.visibility = View.GONE
+            tvWarning?.visibility = View.GONE
             return
         }
         val hours = TimeUnit.MILLISECONDS.toHours(elapsed)
         val minutes = TimeUnit.MILLISECONDS.toMinutes(elapsed) % 60
         val seconds = TimeUnit.MILLISECONDS.toSeconds(elapsed) % 60
         tvElapsed.text = String.format(Locale.GERMAN, "%02d:%02d:%02d", hours, minutes, seconds)
+
+        if (tvWarning != null) {
+            when {
+                warnRedHours >= 0 && hours >= warnRedHours -> {
+                    tvWarning.visibility = View.VISIBLE
+                    tvWarning.text = "⚠️ $warnRedText"
+                    tvWarning.setTextColor(getColor(R.color.warning_red))
+                }
+                warnOrangeHours >= 0 && hours >= warnOrangeHours -> {
+                    tvWarning.visibility = View.VISIBLE
+                    tvWarning.text = "⚠️ $warnOrangeText"
+                    tvWarning.setTextColor(getColor(R.color.warning_orange))
+                }
+                else -> tvWarning.visibility = View.GONE
+            }
+        }
     }
 
     private fun updateMilestoneTimers() {
-        updateMilestoneTimerRow(einleitungStartTime, binding.tvEinleitungTime, binding.tvEinleitungElapsed)
-        updateMilestoneTimerRow(wehenUnregelStartTime, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed)
-        updateMilestoneTimerRow(wehenRegelStartTime, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed)
+        updateMilestoneTimerRow(
+            einleitungStartTime,
+            binding.tvEinleitungTime,
+            binding.tvEinleitungElapsed,
+            binding.tvEinleitungWarning,
+            warnOrangeHours = EINLEITUNG_WARN_ORANGE_H, warnOrangeText = EINLEITUNG_WARN_ORANGE_TEXT,
+            warnRedHours = EINLEITUNG_WARN_RED_H, warnRedText = EINLEITUNG_WARN_RED_TEXT
+        )
+        updateMilestoneTimerRow(
+            wehenUnregelStartTime,
+            binding.tvWehenUnregelTime,
+            binding.tvWehenUnregelElapsed,
+            binding.tvWehenUnregelWarning,
+            warnOrangeHours = WEHEN_UNREG_WARN_ORANGE_H, warnOrangeText = WEHEN_UNREG_WARN_ORANGE_TEXT,
+            warnRedHours = WEHEN_UNREG_WARN_RED_H, warnRedText = WEHEN_UNREG_WARN_RED_TEXT
+        )
+        updateMilestoneTimerRow(
+            wehenRegelStartTime,
+            binding.tvWehenRegelTime,
+            binding.tvWehenRegelElapsed,
+            binding.tvWehenRegelWarning,
+            warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
+            warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
+        )
     }
 
     private fun setupMedicalInfo() {
@@ -590,6 +662,13 @@ class MainActivity : AppCompatActivity() {
         layout.removeAllViews()
 
         contacts.forEach { contact ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
             val tv = TextView(this).apply {
                 text = when {
                     contact.number.isNotEmpty() -> "📞 ${contact.name}: ${contact.number}"
@@ -598,6 +677,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 textSize = 14f
                 setPadding(0, 8, 0, 8)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 if (contact.number.isNotEmpty()) {
                     setTextColor(getColor(R.color.link_blue))
                     setOnClickListener {
@@ -605,18 +685,29 @@ class MainActivity : AppCompatActivity() {
                         startActivity(intent)
                     }
                 }
-                if (contact.editable) {
-                    if (contact.number.isEmpty()) {
-                        setOnClickListener { showEditContactDialog(contact.name) }
-                    } else {
-                        setOnLongClickListener {
-                            showEditContactDialog(contact.name)
-                            true
-                        }
-                    }
+                if (contact.editable && contact.number.isEmpty()) {
+                    setOnClickListener { showEditContactDialog(contact.name) }
                 }
             }
-            layout.addView(tv)
+            row.addView(tv)
+            if (contact.editable) {
+                val btnEdit = Button(this).apply {
+                    text = "✏️"
+                    textSize = 12f
+                    val lp = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                    lp.setMargins(8, 0, 0, 0)
+                    layoutParams = lp
+                    val outValue = android.util.TypedValue()
+                    context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+                    setBackgroundResource(outValue.resourceId)
+                    setOnClickListener { showEditContactDialog(contact.name) }
+                }
+                row.addView(btnEdit)
+            }
+            layout.addView(row)
         }
 
         binding.btnExportContacts.setOnClickListener { exportContacts() }
@@ -1255,5 +1346,21 @@ class MainActivity : AppCompatActivity() {
         private val EDITABLE_CONTACT_KEYS = listOf(
             "Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
         )
+
+        // Milestone timer warning thresholds (hours) and messages
+        private const val EINLEITUNG_WARN_ORANGE_H = 12
+        private const val EINLEITUNG_WARN_ORANGE_TEXT = ">12h: Arzt über Einleitungsdauer informieren"
+        private const val EINLEITUNG_WARN_RED_H = 24
+        private const val EINLEITUNG_WARN_RED_TEXT = ">24h: Dringend Arzt kontaktieren!"
+
+        private const val WEHEN_UNREG_WARN_ORANGE_H = 8
+        private const val WEHEN_UNREG_WARN_ORANGE_TEXT = ">8h: Hebamme informieren"
+        private const val WEHEN_UNREG_WARN_RED_H = 12
+        private const val WEHEN_UNREG_WARN_RED_TEXT = ">12h: Arzt / KH kontaktieren!"
+
+        private const val WEHEN_REG_WARN_ORANGE_H = 4
+        private const val WEHEN_REG_WARN_ORANGE_TEXT = ">4h: KH-Fahrt prüfen"
+        private const val WEHEN_REG_WARN_RED_H = 8
+        private const val WEHEN_REG_WARN_RED_TEXT = ">8h: Sofort ins Krankenhaus!"
     }
 }
