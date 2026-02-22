@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity() {
         setupBirthInfo()
         setupMedicalInfo()
         setupGeburtsWuensche()
+        setupWehenfoerderung()
         setupNotizen()
         setupKinderInfo()
         setupHospitalInfo()
@@ -161,6 +162,36 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(getColor(R.color.text_primary))
             }
             layout.addView(tv)
+        }
+    }
+
+    private fun setupWehenfoerderung() {
+        binding.tvWehenfoerderung.text = buildString {
+            appendLine("🚶 Bewegung & Schwerkraft nutzen:")
+            appendLine("  • Spazieren gehen, Treppen steigen")
+            appendLine("  • Auf Geburtsball wippen / kreisen")
+            appendLine("  • Aufrechte Positionen bevorzugen")
+            appendLine("")
+            appendLine("🛁 Wärme & Entspannung:")
+            appendLine("  • Warmes Bad oder Dusche")
+            appendLine("  • Wärmekissen auf Bauch / Kreuz")
+            appendLine("  • Massage, Entspannungsübungen")
+            appendLine("")
+            appendLine("🌿 Natürliche Mittel:")
+            appendLine("  • Rizinus (nach Absprache mit Hebamme)")
+            appendLine("  • Himbeerblatttee")
+            appendLine("  • Akupressur (z. B. Punkt Milz 6)")
+            appendLine("  • Brustwarzen-Stimulation")
+            appendLine("")
+            appendLine("💨 Atemtechniken & mentale Stärke:")
+            appendLine("  • Langsam und tief ausatmen bei Wehen")
+            appendLine("  • Hypnobirthing / Visualisierung")
+            appendLine("  • Vertraute Musik, Ruhe, Kerzenlicht")
+            appendLine("")
+            appendLine("👫 Unterstützung:")
+            appendLine("  • Vater/Begleitung aktiv dabei")
+            appendLine("  • Kontinuierliche Doula-/Hebammenbegleitung")
+            append("  • Wenig Störungen, dunkles ruhiges Zimmer")
         }
     }
 
