@@ -619,13 +619,18 @@
                     android:textColor="@color/primary_dark"
                     android:paddingBottom="8dp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/tvNotizen"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
                     android:textColor="@color/text_primary"
-                    android:lineSpacingMultiplier="1.4" />
+                    android:lineSpacingMultiplier="1.4"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:minLines="3"
+                    android:gravity="top"
+                    android:background="@android:color/transparent"
+                    android:hint="Notizen eingeben…" />
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>

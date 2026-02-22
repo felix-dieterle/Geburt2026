@@ -477,13 +477,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNotizen() {
-        binding.tvNotizen.text = buildString {
+        val defaultNotes = buildString {
             appendLine("• Falls Einleitung in Konstanz: Rizinus empfohlen")
             appendLine("  (kann auch 12h gewartet werden)")
             appendLine("• Geburt/Einleitung nach Blasensprung:")
             appendLine("  Paar Tage möglich, wenn Blutwerte gut")
             append("• Nach 12h darf man nach Hause")
         }
+        val prefs = getSharedPreferences("notizen", MODE_PRIVATE)
+        binding.tvNotizen.setText(prefs.getString("text", defaultNotes))
+        binding.tvNotizen.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                prefs.edit().putString("text", s?.toString() ?: "").apply()
+            }
+        })
     }
 
     private fun setupKinderInfo() {
@@ -1196,7 +1205,9 @@ class MainActivity : AppCompatActivity() {
         binding.tvCurrentPhase.text = "${phase.emoji} Phase ${index + 1}: ${phase.name}"
         binding.tvPhaseHint.text = phase.hint
         binding.btnPrevPhase.isEnabled = index > 0
+        binding.btnPrevPhase.text = if (index > 0) "← ${geburtPhasen[index - 1].name}" else "← Zurück"
         binding.btnNextPhase.isEnabled = index < geburtPhasen.lastIndex
+        binding.btnNextPhase.text = if (index < geburtPhasen.lastIndex) "${geburtPhasen[index + 1].name} →" else "Weiter →"
 
         val indicator = (0..geburtPhasen.lastIndex).joinToString(" ") { i ->
             if (i == index) "●" else "○"
