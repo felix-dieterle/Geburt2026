@@ -52,8 +52,94 @@
             android:visibility="gone"
             android:layout_marginBottom="8dp" />
 
+        <!-- Phasen der Geburt Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardPhasen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_phase">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🤰 Phasen der Geburt"
+                    android:textSize="13sp"
+                    android:textColor="#CCFFFFFF"
+                    android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvCurrentPhase"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Phase 1: Latenzphase"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/white"
+                    android:gravity="center"
+                    android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvPhaseHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Unregelmäßige Wehen, Vorbereitung"
+                    android:textSize="13sp"
+                    android:textColor="#CCFFFFFF"
+                    android:gravity="center"
+                    android:paddingBottom="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnPrevPhase"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="← Zurück"
+                        android:textSize="13sp"
+                        android:backgroundTint="@color/phase_button_prev" />
+
+                    <Button
+                        android:id="@+id/btnNextPhase"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="Weiter →"
+                        android:textSize="13sp"
+                        android:backgroundTint="@color/phase_button_next" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvPhaseIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="● ○ ○ ○ ○"
+                    android:textSize="14sp"
+                    android:textColor="#CCFFFFFF"
+                    android:gravity="center"
+                    android:paddingTop="8dp" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Blasensprung Timer Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardTimer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"

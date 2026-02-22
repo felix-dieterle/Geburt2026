@@ -63,6 +63,28 @@ class MainActivity : AppCompatActivity() {
         "Hörtest ggf. gleich nach Geburt",
     )
 
+    private val geburtPhasen: List<GeburtPhase> by lazy {
+        listOf(
+            GeburtPhase("🌅", "Latenzphase", "Unregelmäßige Wehen – Vorbereitung & Abwarten") { b ->
+                listOf(b.cardTimer, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts)
+            },
+            GeburtPhase("🌊", "Eröffnungsphase", "Regelmäßige Wehen – Gebärmutterhals öffnet sich") { b ->
+                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts)
+            },
+            GeburtPhase("⚡", "Übergangsphase", "Intensive Wehen – kurze Pausen, Fokus halten") { b ->
+                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
+            },
+            GeburtPhase("💪", "Austreibungsphase", "Pressen – Baby kommt!") { b ->
+                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
+            },
+            GeburtPhase("🍼", "Nachgeburtsphase", "Hep-B-Impfung, erste Stunden, Nachgeburt") { b ->
+                listOf(b.cardMedical, b.cardChecklist, b.cardContacts)
+            },
+        )
+    }
+
+    private var currentPhaseIndex: Int = 0
+
     private val tasks = mutableListOf(
         Task("Hebamme / KH Konstanz über Hep-B-Status informiert?", false),
         Task("Kinderkleidung (4 u. 7 J.) für mind. 4 Tage gepackt?", false),
@@ -93,6 +115,7 @@ class MainActivity : AppCompatActivity() {
         setupChecklist()
         setupContacts()
         setupSearch()
+        setupPhasen()
     }
 
     override fun onResume() {
@@ -450,6 +473,9 @@ class MainActivity : AppCompatActivity() {
                             setPadding(12, 10, 12, 10)
                             setTextColor(getColor(R.color.link_blue))
                             setOnClickListener {
+                                if (section.cardView.visibility == View.GONE) {
+                                    section.cardView.visibility = View.VISIBLE
+                                }
                                 binding.scrollView.post {
                                     binding.scrollView.smoothScrollTo(0, section.cardView.top)
                                 }
@@ -713,8 +739,56 @@ class MainActivity : AppCompatActivity() {
             .apply()
     }
 
+    private fun setupPhasen() {
+        currentPhaseIndex = getSharedPreferences("phasen", MODE_PRIVATE)
+            .getInt("currentPhase", 0)
+        applyPhase(currentPhaseIndex)
+
+        binding.btnNextPhase.setOnClickListener {
+            if (currentPhaseIndex < geburtPhasen.lastIndex) {
+                currentPhaseIndex++
+                applyPhase(currentPhaseIndex)
+                getSharedPreferences("phasen", MODE_PRIVATE).edit()
+                    .putInt("currentPhase", currentPhaseIndex).apply()
+            }
+        }
+        binding.btnPrevPhase.setOnClickListener {
+            if (currentPhaseIndex > 0) {
+                currentPhaseIndex--
+                applyPhase(currentPhaseIndex)
+                getSharedPreferences("phasen", MODE_PRIVATE).edit()
+                    .putInt("currentPhase", currentPhaseIndex).apply()
+            }
+        }
+    }
+
+    private fun applyPhase(index: Int) {
+        val phase = geburtPhasen[index]
+        val allCards = listOf(
+            binding.cardTimer, binding.cardMedical, binding.cardWishes,
+            binding.cardLabor, binding.cardNotes, binding.cardKids,
+            binding.cardBetreuung, binding.cardHospital, binding.cardChecklist,
+            binding.cardContacts
+        )
+        val visibleCards = phase.visibleCards(binding)
+        allCards.forEach { card ->
+            card.visibility = if (visibleCards.contains(card)) View.VISIBLE else View.GONE
+        }
+
+        binding.tvCurrentPhase.text = "${phase.emoji} Phase ${index + 1}: ${phase.name}"
+        binding.tvPhaseHint.text = phase.hint
+        binding.btnPrevPhase.isEnabled = index > 0
+        binding.btnNextPhase.isEnabled = index < geburtPhasen.lastIndex
+
+        val indicator = (0..geburtPhasen.lastIndex).joinToString(" ") { i ->
+            if (i == index) "●" else "○"
+        }
+        binding.tvPhaseIndicator.text = indicator
+    }
+
     data class Task(val text: String, val done: Boolean)
     data class Contact(val name: String, val number: String, val editable: Boolean = false)
     data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long)
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
+    data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
 }
