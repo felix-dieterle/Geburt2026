@@ -497,6 +497,30 @@
 
                 </LinearLayout>
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Benutzerdefinierte Timer -->
+                <LinearLayout
+                    android:id="@+id/llCustomTimers"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/btnAddCustomTimer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:text="➕ Timer hinzufügen"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/primary_dark"
+                    android:layout_marginTop="4dp" />
+
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
