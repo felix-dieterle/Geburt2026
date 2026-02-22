@@ -536,6 +536,16 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit().putString("text", s?.toString() ?: "").apply()
             }
         })
+
+        val einleitungPrefs = getSharedPreferences("einleitung_notizen", MODE_PRIVATE)
+        binding.etEinleitungNotizen.setText(einleitungPrefs.getString("text", ""))
+        binding.etEinleitungNotizen.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                einleitungPrefs.edit().putString("text", s?.toString() ?: "").apply()
+            }
+        })
     }
 
     private fun setupKinderInfo() {
