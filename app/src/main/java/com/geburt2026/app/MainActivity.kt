@@ -128,6 +128,10 @@ class MainActivity : AppCompatActivity() {
     private var wehenUnregelStartTime: Long = 0L
     private var wehenRegelStartTime: Long = 0L
 
+    // Custom (user-defined) timers
+    private data class CustomTimer(val id: Long, var label: String, var startTime: Long)
+    private val customTimers = mutableListOf<CustomTimer>()
+
     private val timerRunnable = object : Runnable {
         override fun run() {
             updateBirthTimer()
@@ -339,6 +343,11 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+
+        // Custom timers
+        loadCustomTimers()
+        renderCustomTimers()
+        binding.btnAddCustomTimer.setOnClickListener { showAddCustomTimerDialog() }
     }
 
     private fun showMilestoneStartDialog(label: String, onConfirmed: (Long) -> Unit) {
@@ -446,6 +455,247 @@ class MainActivity : AppCompatActivity() {
             warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
             warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
         )
+        // Update all custom timer elapsed views
+        for (timer in customTimers) {
+            val container = binding.llCustomTimers.findViewWithTag<LinearLayout>("ct_${timer.id}") ?: continue
+            val tvTime = container.findViewWithTag<TextView>("ct_time_${timer.id}") ?: continue
+            val tvElapsed = container.findViewWithTag<TextView>("ct_elapsed_${timer.id}") ?: continue
+            updateMilestoneTimerRow(timer.startTime, tvTime, tvElapsed)
+        }
+    }
+
+    // ── Custom timers ─────────────────────────────────────────────────────────
+
+    private fun loadCustomTimers() {
+        val prefs = getSharedPreferences("custom_timers", MODE_PRIVATE)
+        val json = prefs.getString("timers_json", null) ?: return
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                customTimers.add(
+                    CustomTimer(
+                        id = obj.getLong("id"),
+                        label = obj.getString("label"),
+                        startTime = obj.getLong("startTime")
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.w("CustomTimers", "Failed to load custom timers", e)
+        }
+    }
+
+    private fun saveCustomTimers() {
+        val arr = JSONArray()
+        for (t in customTimers) {
+            val obj = JSONObject()
+            obj.put("id", t.id)
+            obj.put("label", t.label)
+            obj.put("startTime", t.startTime)
+            arr.put(obj)
+        }
+        getSharedPreferences("custom_timers", MODE_PRIVATE)
+            .edit().putString("timers_json", arr.toString()).apply()
+    }
+
+    private fun showAddCustomTimerDialog() {
+        val suggestions = arrayOf(
+            "💧 Blasensprung",
+            "💊 Oxytocin-Start",
+            "🩺 Erste Untersuchung",
+            "🧬 Plazenta abgegangen",
+            "👶 Baby geboren",
+            "🔔 Erster Pressdrang",
+            "✏️ Eigene Bezeichnung…"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Timer hinzufügen")
+            .setItems(suggestions) { _, which ->
+                if (which == suggestions.size - 1) {
+                    // Free-text input
+                    showCustomTimerFreeTextDialog()
+                } else {
+                    addCustomTimer(suggestions[which])
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun showCustomTimerFreeTextDialog() {
+        val editText = EditText(this).apply {
+            hint = "Timer-Bezeichnung"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setPadding(48, 24, 48, 8)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Eigene Bezeichnung")
+            .setView(editText)
+            .setPositiveButton("Hinzufügen") { _, _ ->
+                val label = editText.text.toString().trim()
+                if (label.isNotEmpty()) addCustomTimer(label)
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun addCustomTimer(label: String) {
+        val timer = CustomTimer(id = System.currentTimeMillis(), label = label, startTime = 0L)
+        customTimers.add(timer)
+        saveCustomTimers()
+        renderCustomTimers()
+    }
+
+    private fun renderCustomTimers() {
+        val container = binding.llCustomTimers
+        container.removeAllViews()
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+
+        for (timer in customTimers) {
+            // Divider
+            val divider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1
+                ).also { it.setMargins(0, 0, 0, 10) }
+                setBackgroundColor(getColor(R.color.divider))
+            }
+            container.addView(divider)
+
+            val timerRow = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(0, 0, 0, 10) }
+                tag = "ct_${timer.id}"
+            }
+
+            // Header row: label + start button + delete button
+            val headerRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+
+            val tvLabel = TextView(this).apply {
+                text = timer.label
+                textSize = 14f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(getColor(R.color.primary_dark))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val btnStart = Button(this).apply {
+                text = "Jetzt"
+                textSize = 12f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.primary_dark))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(8, 0, 0, 0) }
+                setOnClickListener { showCustomTimerStartDialog(timer) }
+            }
+
+            val btnDelete = Button(this).apply {
+                text = "✕"
+                textSize = 12f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(4, 0, 0, 0) }
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Timer löschen?")
+                        .setMessage("\"${timer.label}\" wirklich entfernen?")
+                        .setPositiveButton("Löschen") { _, _ ->
+                            customTimers.remove(timer)
+                            saveCustomTimers()
+                            renderCustomTimers()
+                        }
+                        .setNegativeButton("Abbrechen", null)
+                        .show()
+                }
+            }
+
+            headerRow.addView(tvLabel)
+            headerRow.addView(btnStart)
+            headerRow.addView(btnDelete)
+            timerRow.addView(headerRow)
+
+            // Start time display
+            val tvTime = TextView(this).apply {
+                text = if (timer.startTime > 0L) sdf.format(Date(timer.startTime)) else "–"
+                textSize = 12f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 4, 0, 0)
+                tag = "ct_time_${timer.id}"
+            }
+            timerRow.addView(tvTime)
+
+            // Elapsed time display
+            val tvElapsed = TextView(this).apply {
+                text = ""
+                textSize = 22f
+                setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                setTextColor(getColor(R.color.primary_dark))
+                visibility = if (timer.startTime > 0L) View.VISIBLE else View.GONE
+                tag = "ct_elapsed_${timer.id}"
+            }
+            timerRow.addView(tvElapsed)
+
+            container.addView(timerRow)
+
+            // Update elapsed time immediately
+            updateMilestoneTimerRow(timer.startTime, tvTime, tvElapsed)
+        }
+    }
+
+    private fun showCustomTimerStartDialog(timer: CustomTimer) {
+        val now = Calendar.getInstance()
+        val options = arrayOf("Jetzt starten", "Uhrzeit wählen", "Zurücksetzen")
+        AlertDialog.Builder(this)
+            .setTitle("${timer.label} – Startzeit")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        timer.startTime = System.currentTimeMillis()
+                        saveCustomTimers()
+                        renderCustomTimers()
+                    }
+                    1 -> {
+                        TimePickerDialog(
+                            this,
+                            { _, hour, minute ->
+                                val cal = Calendar.getInstance()
+                                cal.set(Calendar.HOUR_OF_DAY, hour)
+                                cal.set(Calendar.MINUTE, minute)
+                                cal.set(Calendar.SECOND, 0)
+                                cal.set(Calendar.MILLISECOND, 0)
+                                if (cal.timeInMillis > System.currentTimeMillis()) {
+                                    // If selected time is in the future, assume the user meant yesterday
+                                    cal.add(Calendar.DAY_OF_YEAR, -1)
+                                }
+                                saveCustomTimers()
+                                renderCustomTimers()
+                            },
+                            now.get(Calendar.HOUR_OF_DAY),
+                            now.get(Calendar.MINUTE),
+                            true
+                        ).show()
+                    }
+                    2 -> {
+                        timer.startTime = 0L
+                        saveCustomTimers()
+                        renderCustomTimers()
+                    }
+                }
+            }
+            .show()
     }
 
     private fun setupMedicalInfo() {
