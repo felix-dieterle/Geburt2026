@@ -289,6 +289,8 @@ class MainActivity : AppCompatActivity() {
             Contact("KH Singen", "0773189-0"),
             Contact("Notruf", "112"),
             Contact("Kinderarzt", prefs.getString("Kinderarzt", "") ?: "", editable = true),
+            Contact("Arbeit (Teams)", prefs.getString("Arbeit (Teams)", "") ?: "", editable = true),
+            Contact("Gemeinde (Essen)", prefs.getString("Gemeinde (Essen)", "") ?: "", editable = true),
         )
 
         val layout = binding.contactsContainer
