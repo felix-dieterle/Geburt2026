@@ -324,9 +324,17 @@ class MainActivity : AppCompatActivity() {
     private fun setupHospitalInfo() {
         binding.tvHospitalInfo.text = buildString {
             appendLine("🏥 Hegau-Bodensee-Klinikum Singen")
-            appendLine("   oder Krankenhaus Konstanz")
-            appendLine("📞 KH Singen: 07731 89-0")
-            appendLine("📞 KH Konstanz: 07531 801-0")
+            appendLine("   📞 Zentrale: 07731 89-0")
+            appendLine("   📞 Kreissaal: 07731 89-1710")
+            appendLine("")
+            appendLine("🏥 Hegau-Bodensee-Klinikum Überlingen")
+            appendLine("   📞 Zentrale: 07551 89-0")
+            appendLine("   📞 Kreissaal: 07551 89-1310")
+            appendLine("")
+            appendLine("🏥 Krankenhaus Konstanz")
+            appendLine("   📞 Zentrale: 07531 801-0")
+            appendLine("   📞 Kreissaal: 07531 801-2830")
+            appendLine("")
             appendLine("📞 Notruf: 112")
             appendLine("")
             appendLine("👨‍⚕️ Vater ist im Krankenhaus dabei")
@@ -377,8 +385,12 @@ class MainActivity : AppCompatActivity() {
         val contacts = listOf(
             Contact("Oma (Sipplinen)", prefs.getString("Oma (Sipplinen)", "") ?: "", editable = true),
             Contact("Hebamme", prefs.getString("Hebamme", "") ?: "", editable = true),
-            Contact("KH Konstanz", "0753180100"),
-            Contact("KH Singen", "0773189-0"),
+            Contact("KH Singen (Zentrale)", "07731 89-0"),
+            Contact("KH Singen (Kreissaal)", "07731 89-1710"),
+            Contact("KH Überlingen (Zentrale)", "07551 89-0"),
+            Contact("KH Überlingen (Kreissaal)", "07551 89-1310"),
+            Contact("KH Konstanz (Zentrale)", "07531 801-0"),
+            Contact("KH Konstanz (Kreissaal)", "07531 801-2830"),
             Contact("Notruf", "112"),
             Contact("Kinderarzt", prefs.getString("Kinderarzt", "") ?: "", editable = true),
             Contact("Arbeit (Teams)", prefs.getString("Arbeit (Teams)", "") ?: "", editable = true),
@@ -509,7 +521,7 @@ class MainActivity : AppCompatActivity() {
                     val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
                     EDITABLE_CONTACT_KEYS
                         .joinToString(" ") { "$it ${prefs.getString(it, "") ?: ""}" } +
-                        " KH Konstanz KH Singen Notruf"
+                        " KH Konstanz KH Singen KH Überlingen Kreissaal Notruf"
                 },
                 binding.cardContacts
             ),
