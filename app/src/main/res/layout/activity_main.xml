@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/scrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_light"
@@ -30,7 +31,26 @@
             android:textSize="14sp"
             android:textColor="@color/text_secondary"
             android:gravity="center"
-            android:paddingBottom="12dp" />
+            android:paddingBottom="8dp" />
+
+        <!-- Textsuche -->
+        <EditText
+            android:id="@+id/etSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="4dp"
+            android:hint="🔍 Seite durchsuchen..."
+            android:inputType="text"
+            android:padding="10dp"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/searchResultsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp" />
 
         <!-- Blasensprung Timer Card -->
         <androidx.cardview.widget.CardView
@@ -151,6 +171,7 @@
 
         <!-- Medizinische Info Card (Hep B) -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardMedical"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -186,6 +207,7 @@
 
         <!-- Geburtswünsche Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardWishes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -219,6 +241,7 @@
 
         <!-- Wehenförderung Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardLabor"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -254,6 +277,7 @@
 
         <!-- Notizen zur Einleitung Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardNotes"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -289,6 +313,7 @@
 
         <!-- Kinder & Transport Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardKids"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -331,8 +356,61 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Betreuungsplaner Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardBetreuung"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_care">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👶 Betreuungsplaner – Kinder"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvBetreuungInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📅 Nächste 48 Stunden"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="8dp" />
+
+                <LinearLayout
+                    android:id="@+id/betreuungContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/btnAddBetreuung"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="+ Betreuung eintragen"
+                    android:textSize="13sp"
+                    android:backgroundTint="@color/primary_dark" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Krankenhaus Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardHospital"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -395,6 +473,7 @@
 
         <!-- Checkliste Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardChecklist"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -444,6 +523,7 @@
 
         <!-- Kontakte Card -->
         <androidx.cardview.widget.CardView
+            android:id="@+id/cardContacts"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"

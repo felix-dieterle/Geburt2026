@@ -1,20 +1,30 @@
 package com.geburt2026.app
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.View
+import android.text.Editable
 import android.text.InputType
+import android.text.TextWatcher
+import android.util.Log
+import android.view.View
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.cardview.widget.CardView
 import com.geburt2026.app.databinding.ActivityMainBinding
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -45,6 +55,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val geburtswuensche = listOf(
+        "Wenig CTG",
+        "Wenig Untersuchungen",
+        "Nabelschnur ausbluten / auspulsieren lassen",
+        "Ambulante Geburt",
+        "Hörtest ggf. gleich nach Geburt",
+    )
+
     private val tasks = mutableListOf(
         Task("Hebamme / KH Konstanz über Hep-B-Status informiert?", false),
         Task("Kinderkleidung (4 u. 7 J.) für mind. 4 Tage gepackt?", false),
@@ -55,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         Task("Kindergarten/Schule über Abwesenheit informiert?", false),
         Task("Verwandte/Freunde für Unterstützung kontaktiert?", false),
         Task("Krankenhaustasche vollständig gepackt?", false),
+        Task("Hörtest für Neugeborenes vor Entlassung?", false),
         Task("Notfallkontakte auf dem Handy gespeichert?", false),
     )
 
@@ -69,9 +88,11 @@ class MainActivity : AppCompatActivity() {
         setupWehenfoerderung()
         setupNotizen()
         setupKinderInfo()
+        setupBetreuung()
         setupHospitalInfo()
         setupChecklist()
         setupContacts()
+        setupSearch()
     }
 
     override fun onResume() {
@@ -146,18 +167,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupGeburtsWuensche() {
-        val wishes = listOf(
-            "Wenig CTG",
-            "Wenig Untersuchungen",
-            "Nabelschnur ausbluten / auspulsieren lassen",
-            "Ambulante Geburt",
-            "Hörtest ggf. gleich nach Geburt",
-        )
-
         val layout = binding.wishesContainer
         layout.removeAllViews()
 
-        wishes.forEach { wish ->
+        geburtswuensche.forEach { wish ->
             val tv = TextView(this).apply {
                 text = "• $wish"
                 textSize = 14f
@@ -348,6 +361,360 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun setupSearch() {
+        val sections = listOf(
+            SearchSection(
+                "🏥 Medizinische Hinweise",
+                { binding.tvHepBInfo.text.toString() },
+                binding.cardMedical
+            ),
+            SearchSection(
+                "💜 Geburtswünsche",
+                { geburtswuensche.joinToString(" ") },
+                binding.cardWishes
+            ),
+            SearchSection(
+                "🌿 Wehenförderung",
+                { binding.tvWehenfoerderung.text.toString() },
+                binding.cardLabor
+            ),
+            SearchSection(
+                "📝 Notizen zur Einleitung",
+                { binding.tvNotizen.text.toString() },
+                binding.cardNotes
+            ),
+            SearchSection(
+                "👨‍👩‍👧‍👦 Kinder & Transport",
+                { binding.tvKinderStatus.text.toString() },
+                binding.cardKids
+            ),
+            SearchSection(
+                "👶 Betreuungsplaner",
+                { loadBetreuungsEintraege().joinToString(" ") { "${it.name} ${if (it.unbegrenzt) "Unbegrenzt" else ""}" } },
+                binding.cardBetreuung
+            ),
+            SearchSection(
+                "🏥 Krankenhaus",
+                { binding.tvHospitalInfo.text.toString() },
+                binding.cardHospital
+            ),
+            SearchSection(
+                "✅ Checkliste",
+                { tasks.joinToString(" ") { it.text } },
+                binding.cardChecklist
+            ),
+            SearchSection(
+                "📞 Kontakte",
+                {
+                    val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+                    listOf("Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)")
+                        .joinToString(" ") { "$it ${prefs.getString(it, "") ?: ""}" } +
+                        " KH Konstanz KH Singen Notruf"
+                },
+                binding.cardContacts
+            ),
+        )
+
+        binding.etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                val query = s?.toString()?.trim()?.lowercase() ?: ""
+                val resultsLayout = binding.searchResultsContainer
+                resultsLayout.removeAllViews()
+
+                if (query.length < 2) {
+                    resultsLayout.visibility = View.GONE
+                    return
+                }
+
+                val matches = sections.filter { section ->
+                    section.title.lowercase().contains(query) ||
+                        section.getContent().lowercase().contains(query)
+                }
+
+                resultsLayout.visibility = View.VISIBLE
+                if (matches.isEmpty()) {
+                    val tv = TextView(this@MainActivity).apply {
+                        text = "Kein Ergebnis für „$query""
+                        textSize = 13f
+                        setPadding(12, 8, 12, 8)
+                        setTextColor(getColor(R.color.text_secondary))
+                    }
+                    resultsLayout.addView(tv)
+                } else {
+                    matches.forEach { section ->
+                        val tv = TextView(this@MainActivity).apply {
+                            text = "➡️ ${section.title}"
+                            textSize = 14f
+                            setPadding(12, 10, 12, 10)
+                            setTextColor(getColor(R.color.link_blue))
+                            setOnClickListener {
+                                binding.scrollView.post {
+                                    binding.scrollView.smoothScrollTo(0, section.cardView.top)
+                                }
+                            }
+                        }
+                        resultsLayout.addView(tv)
+                    }
+                }
+            }
+        })
+    }
+
+    private fun setupBetreuung() {
+        renderBetreuung()
+        binding.btnAddBetreuung.setOnClickListener {
+            showAddBetreuungDialog()
+        }
+    }
+
+    private fun renderBetreuung() {
+        val layout = binding.betreuungContainer
+        layout.removeAllViews()
+
+        val eintraege = loadBetreuungsEintraege()
+        val now = System.currentTimeMillis()
+        val in48h = now + TimeUnit.HOURS.toMillis(48)
+        val sdf = SimpleDateFormat("EE dd.MM. HH:mm", Locale.GERMAN)
+
+        val relevant = eintraege.filter { e ->
+            if (e.unbegrenzt) true else e.bis > now && e.von < in48h
+        }
+
+        if (relevant.isEmpty()) {
+            val tv = TextView(this).apply {
+                text = "Keine Betreuung für die nächsten 48 Stunden eingetragen"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 4, 0, 4)
+            }
+            layout.addView(tv)
+        } else {
+            val expiringEntry = relevant.filter { !it.unbegrenzt }.minByOrNull { it.bis }
+            if (expiringEntry != null) {
+                val hoursLeft = TimeUnit.MILLISECONDS.toHours(expiringEntry.bis - now)
+                if (hoursLeft <= 24) {
+                    val warnTv = TextView(this).apply {
+                        text = "⚠️ Betreuung läuft ab: ${sdf.format(Date(expiringEntry.bis))} Uhr (noch ${hoursLeft} Std.)"
+                        textSize = 13f
+                        setTextColor(getColor(R.color.warning_orange))
+                        setPadding(0, 4, 0, 8)
+                        setTypeface(null, android.graphics.Typeface.BOLD)
+                    }
+                    layout.addView(warnTv)
+                }
+            }
+
+            relevant.forEach { entry ->
+                val timeText = if (entry.unbegrenzt) {
+                    "Unbegrenzt verfügbar"
+                } else {
+                    "${sdf.format(Date(entry.von))} – ${sdf.format(Date(entry.bis))} Uhr"
+                }
+                val icon = if (entry.unbegrenzt) "♾️" else "📅"
+                val tv = TextView(this).apply {
+                    text = "$icon ${entry.name}: $timeText"
+                    textSize = 14f
+                    setTextColor(getColor(R.color.text_primary))
+                    setPadding(0, 6, 0, 6)
+                    setOnLongClickListener {
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Eintrag löschen?")
+                            .setMessage("„${entry.name}" entfernen?")
+                            .setPositiveButton("Löschen") { _, _ ->
+                                deleteBetreuungsEintrag(entry.id)
+                                renderBetreuung()
+                            }
+                            .setNegativeButton("Abbrechen", null)
+                            .show()
+                        true
+                    }
+                }
+                layout.addView(tv)
+            }
+        }
+
+        val count = relevant.size
+        binding.tvBetreuungInfo.text =
+            "📅 Nächste 48 Stunden – $count Einträge (lang drücken zum Löschen)"
+    }
+
+    private fun showAddBetreuungDialog() {
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 24)
+        }
+
+        val etName = EditText(this).apply {
+            hint = "Name der Betreuungsperson"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+        }
+        dialogLayout.addView(etName)
+
+        val radioGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            setPadding(0, 16, 0, 8)
+        }
+        val rbUnbegrenzt = RadioButton(this).apply {
+            text = "♾️ Unbegrenzt"
+            id = View.generateViewId()
+        }
+        val rbZuweisung = RadioButton(this).apply {
+            text = "📅 Zuweisung (Zeitraum festlegen)"
+            id = View.generateViewId()
+        }
+        radioGroup.addView(rbUnbegrenzt)
+        radioGroup.addView(rbZuweisung)
+        rbUnbegrenzt.isChecked = true
+        dialogLayout.addView(radioGroup)
+
+        var vonCalendar = Calendar.getInstance()
+        var bisCalendar = Calendar.getInstance().apply { add(Calendar.HOUR_OF_DAY, 8) }
+        val sdfShort = SimpleDateFormat("EE dd.MM. HH:mm", Locale.GERMAN)
+
+        val tvVon = TextView(this).apply {
+            text = "Von: ${sdfShort.format(vonCalendar.time)} (antippen)"
+            textSize = 14f
+            setPadding(0, 8, 0, 4)
+            setTextColor(getColor(R.color.link_blue))
+            visibility = View.GONE
+        }
+        val tvBis = TextView(this).apply {
+            text = "Bis: ${sdfShort.format(bisCalendar.time)} (antippen)"
+            textSize = 14f
+            setPadding(0, 4, 0, 8)
+            setTextColor(getColor(R.color.link_blue))
+            visibility = View.GONE
+        }
+
+        tvVon.setOnClickListener {
+            showDateTimePicker(vonCalendar) { cal ->
+                vonCalendar = cal
+                tvVon.text = "Von: ${sdfShort.format(vonCalendar.time)} (antippen)"
+            }
+        }
+        tvBis.setOnClickListener {
+            showDateTimePicker(bisCalendar) { cal ->
+                bisCalendar = cal
+                tvBis.text = "Bis: ${sdfShort.format(bisCalendar.time)} (antippen)"
+            }
+        }
+
+        radioGroup.setOnCheckedChangeListener { _, checkedId ->
+            val isZuweisung = checkedId == rbZuweisung.id
+            tvVon.visibility = if (isZuweisung) View.VISIBLE else View.GONE
+            tvBis.visibility = if (isZuweisung) View.VISIBLE else View.GONE
+        }
+
+        dialogLayout.addView(tvVon)
+        dialogLayout.addView(tvBis)
+
+        AlertDialog.Builder(this)
+            .setTitle("👶 Betreuung eintragen")
+            .setView(dialogLayout)
+            .setPositiveButton("Speichern") { _, _ ->
+                val name = etName.text.toString().trim()
+                if (name.isEmpty()) {
+                    Toast.makeText(this, "Bitte Name eingeben", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val unbegrenzt = rbUnbegrenzt.isChecked
+                if (!unbegrenzt && vonCalendar.timeInMillis >= bisCalendar.timeInMillis) {
+                    Toast.makeText(this, "Startzeit muss vor der Endzeit liegen", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                saveBetreuungsEintrag(
+                    BetreuungsEintrag(
+                        id = System.currentTimeMillis(),
+                        name = name,
+                        unbegrenzt = unbegrenzt,
+                        von = if (unbegrenzt) 0L else vonCalendar.timeInMillis,
+                        bis = if (unbegrenzt) 0L else bisCalendar.timeInMillis
+                    )
+                )
+                renderBetreuung()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun showDateTimePicker(initial: Calendar, onSet: (Calendar) -> Unit) {
+        val cal = initial.clone() as Calendar
+        DatePickerDialog(
+            this,
+            { _, year, month, day ->
+                cal.set(year, month, day)
+                TimePickerDialog(
+                    this,
+                    { _, hour, minute ->
+                        cal.set(Calendar.HOUR_OF_DAY, hour)
+                        cal.set(Calendar.MINUTE, minute)
+                        onSet(cal)
+                    },
+                    cal.get(Calendar.HOUR_OF_DAY),
+                    cal.get(Calendar.MINUTE),
+                    true
+                ).show()
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    private fun loadBetreuungsEintraege(): List<BetreuungsEintrag> {
+        val prefs = getSharedPreferences("betreuung", MODE_PRIVATE)
+        val json = prefs.getString("eintraege", "[]") ?: "[]"
+        return try {
+            val array = JSONArray(json)
+            (0 until array.length()).map { i ->
+                val obj = array.getJSONObject(i)
+                BetreuungsEintrag(
+                    id = obj.getLong("id"),
+                    name = obj.getString("name"),
+                    unbegrenzt = obj.getBoolean("unbegrenzt"),
+                    von = obj.getLong("von"),
+                    bis = obj.getLong("bis")
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("Betreuung", "Failed to load care entries", e)
+            emptyList()
+        }
+    }
+
+    private fun saveBetreuungsEintrag(eintrag: BetreuungsEintrag) {
+        val eintraege = loadBetreuungsEintraege().toMutableList()
+        eintraege.add(eintrag)
+        saveAllEintraege(eintraege)
+    }
+
+    private fun deleteBetreuungsEintrag(id: Long) {
+        val eintraege = loadBetreuungsEintraege().toMutableList()
+        eintraege.removeAll { it.id == id }
+        saveAllEintraege(eintraege)
+    }
+
+    private fun saveAllEintraege(eintraege: List<BetreuungsEintrag>) {
+        val array = JSONArray()
+        eintraege.forEach { e ->
+            array.put(JSONObject().apply {
+                put("id", e.id)
+                put("name", e.name)
+                put("unbegrenzt", e.unbegrenzt)
+                put("von", e.von)
+                put("bis", e.bis)
+            })
+        }
+        getSharedPreferences("betreuung", MODE_PRIVATE)
+            .edit()
+            .putString("eintraege", array.toString())
+            .apply()
+    }
+
     data class Task(val text: String, val done: Boolean)
     data class Contact(val name: String, val number: String, val editable: Boolean = false)
+    data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long)
+    data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
 }
