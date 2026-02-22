@@ -4,11 +4,16 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
+import android.media.MediaPlayer
+import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
+import android.speech.RecognizerIntent
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -29,6 +34,7 @@ import androidx.cardview.widget.CardView
 import com.geburt2026.app.databinding.ActivityMainBinding
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -77,6 +83,34 @@ class MainActivity : AppCompatActivity() {
         uri?.let { importBetreuung(it) }
     }
 
+    // ── Audio recording fields ─────────────────────────────────────────────────
+
+    private var mediaRecorder: MediaRecorder? = null
+    private var currentMediaPlayer: MediaPlayer? = null
+    private var currentRecordingId: Long = 0L
+    private var currentAudioFilePath: String = ""
+    private var isRecording: Boolean = false
+
+    private val requestAudioPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startAudioRecording()
+        else Toast.makeText(this, "Mikrofon-Berechtigung verweigert", Toast.LENGTH_SHORT).show()
+    }
+
+    private val speechRecognitionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val transcription = if (result.resultCode == RESULT_OK) {
+            result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull() ?: ""
+        } else ""
+        saveAudioNotiz(currentRecordingId, currentAudioFilePath, transcription)
+        currentRecordingId = 0L
+        currentAudioFilePath = ""
+        renderAudioNotizen()
+    }
+
     // Blasensprung: 22.02.2026 um 6:15 Uhr
     private val blasensprungTime: Long = Calendar.getInstance().apply {
         set(2026, Calendar.FEBRUARY, 22, 6, 15, 0)
@@ -113,19 +147,19 @@ class MainActivity : AppCompatActivity() {
     private val geburtPhasen: List<GeburtPhase> by lazy {
         listOf(
             GeburtPhase("🌅", "Latenzphase", "Unregelmäßige Wehen – Vorbereitung & Abwarten") { b ->
-                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts)
+                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardAudioNotizen)
             },
             GeburtPhase("🌊", "Eröffnungsphase", "Regelmäßige Wehen – Gebärmutterhals öffnet sich") { b ->
-                listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts)
+                listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
             },
             GeburtPhase("⚡", "Übergangsphase", "Intensive Wehen – kurze Pausen, Fokus halten") { b ->
-                listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
+                listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
             },
             GeburtPhase("💪", "Austreibungsphase", "Pressen – Baby kommt!") { b ->
-                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts)
+                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
             },
             GeburtPhase("🍼", "Nachgeburtsphase", "Hep-B-Impfung, erste Stunden, Nachgeburt") { b ->
-                listOf(b.cardMedical, b.cardChecklist, b.cardContacts)
+                listOf(b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen)
             },
         )
     }
@@ -166,6 +200,7 @@ class MainActivity : AppCompatActivity() {
         setupChecklist()
         setupContacts()
         setupSearch()
+        setupAudioNotizen()
         setupPhasen()
     }
 
@@ -177,6 +212,14 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(timerRunnable)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mediaRecorder?.release()
+        mediaRecorder = null
+        currentMediaPlayer?.release()
+        currentMediaPlayer = null
     }
 
     private fun updateBirthTimer() {
@@ -1195,7 +1238,7 @@ class MainActivity : AppCompatActivity() {
             binding.cardTimer, binding.cardMedical, binding.cardWishes,
             binding.cardLabor, binding.cardNotes, binding.cardKids,
             binding.cardBetreuung, binding.cardHospital, binding.cardChecklist,
-            binding.cardContacts
+            binding.cardContacts, binding.cardAudioNotizen
         )
         val visibleCards = phase.visibleCards(binding)
         allCards.forEach { card ->
@@ -1213,6 +1256,7 @@ class MainActivity : AppCompatActivity() {
             if (i == index) "●" else "○"
         }
         binding.tvPhaseIndicator.text = indicator
+        updateAudioNotizPhaseLabel()
     }
 
     data class Task(val text: String, val done: Boolean)
@@ -1220,6 +1264,7 @@ class MainActivity : AppCompatActivity() {
     data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long, val phone: String = "")
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
     data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
+    data class AudioNotiz(val id: Long, val phaseIndex: Int, val phaseName: String, val timestamp: Long, val audioFilePath: String, val transcription: String)
 
     // ── Contact picker helpers ────────────────────────────────────────────────
 
@@ -1352,8 +1397,264 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    // ── Audionotizen ──────────────────────────────────────────────────────────
+
+    private fun setupAudioNotizen() {
+        updateAudioNotizPhaseLabel()
+        renderAudioNotizen()
+        binding.btnStartAudioNotiz.setOnClickListener {
+            if (isRecording) {
+                stopAudioRecording()
+            } else {
+                if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    startAudioRecording()
+                } else {
+                    requestAudioPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+                }
+            }
+        }
+    }
+
+    private fun updateAudioNotizPhaseLabel() {
+        val phase = geburtPhasen[currentPhaseIndex]
+        binding.tvAudioNotizPhase.text = "Aktuelle Phase: ${phase.emoji} ${phase.name}"
+    }
+
+    private fun startAudioRecording() {
+        currentRecordingId = System.currentTimeMillis()
+        val fileName = "audionotiz_${currentRecordingId}.3gp"
+        currentAudioFilePath = File(filesDir, fileName).absolutePath
+        try {
+            // MediaRecorder(Context) was added in API 31; use no-arg constructor on older versions
+            @Suppress("DEPRECATION")
+            mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(this)
+            } else {
+                MediaRecorder()
+            }
+            mediaRecorder?.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB)
+                setOutputFile(currentAudioFilePath)
+                prepare()
+                start()
+            }
+            isRecording = true
+            binding.btnStartAudioNotiz.text = "⏹ Aufnahme stoppen"
+            binding.btnStartAudioNotiz.backgroundTintList =
+                ColorStateList.valueOf(getColor(R.color.warning_red))
+            Toast.makeText(this, "🎙️ Aufnahme läuft...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("AudioNotiz", "Recording failed", e)
+            Toast.makeText(this, "Aufnahme fehlgeschlagen", Toast.LENGTH_SHORT).show()
+            mediaRecorder?.release()
+            mediaRecorder = null
+            currentRecordingId = 0L
+            currentAudioFilePath = ""
+        }
+    }
+
+    private fun stopAudioRecording() {
+        try {
+            mediaRecorder?.stop()
+            mediaRecorder?.release()
+            mediaRecorder = null
+        } catch (e: Exception) {
+            Log.e("AudioNotiz", "Stop recording failed", e)
+            mediaRecorder?.release()
+            mediaRecorder = null
+        }
+        isRecording = false
+        binding.btnStartAudioNotiz.text = "🎙️ Aufnahme starten"
+        binding.btnStartAudioNotiz.backgroundTintList =
+            ColorStateList.valueOf(getColor(R.color.primary_dark))
+        attemptTranscription()
+    }
+
+    private fun attemptTranscription() {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.GERMAN.toLanguageTag())
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Bitte Notiz für Transkription sprechen")
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            }
+            speechRecognitionLauncher.launch(intent)
+        } catch (e: Exception) {
+            Log.w("AudioNotiz", "Speech recognition not available", e)
+            saveAudioNotiz(currentRecordingId, currentAudioFilePath, "")
+            currentRecordingId = 0L
+            currentAudioFilePath = ""
+            renderAudioNotizen()
+        }
+    }
+
+    private fun loadAudioNotizen(): List<AudioNotiz> {
+        val prefs = getSharedPreferences("audio_notizen", MODE_PRIVATE)
+        val json = prefs.getString("notizen", "[]") ?: "[]"
+        return try {
+            val array = JSONArray(json)
+            (0 until array.length()).map { i ->
+                val obj = array.getJSONObject(i)
+                AudioNotiz(
+                    id = obj.getLong("id"),
+                    phaseIndex = obj.getInt("phaseIndex"),
+                    phaseName = obj.getString("phaseName"),
+                    timestamp = obj.getLong("timestamp"),
+                    audioFilePath = obj.getString("audioFilePath"),
+                    transcription = obj.optString("transcription", "")
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("AudioNotiz", "Failed to load notizen", e)
+            emptyList()
+        }
+    }
+
+    private fun saveAudioNotiz(id: Long, audioFilePath: String, transcription: String) {
+        if (id == 0L) return
+        val phase = geburtPhasen[currentPhaseIndex]
+        val notiz = AudioNotiz(
+            id = id,
+            phaseIndex = currentPhaseIndex,
+            phaseName = phase.name,
+            timestamp = id,
+            audioFilePath = audioFilePath,
+            transcription = transcription
+        )
+        val notizen = loadAudioNotizen().toMutableList()
+        notizen.add(notiz)
+        persistAudioNotizen(notizen)
+    }
+
+    private fun deleteAudioNotiz(id: Long) {
+        val notizen = loadAudioNotizen().toMutableList()
+        notizen.find { it.id == id }?.let { File(it.audioFilePath).delete() }
+        notizen.removeAll { it.id == id }
+        persistAudioNotizen(notizen)
+    }
+
+    private fun persistAudioNotizen(notizen: List<AudioNotiz>) {
+        val array = JSONArray()
+        notizen.forEach { n ->
+            array.put(JSONObject().apply {
+                put("id", n.id)
+                put("phaseIndex", n.phaseIndex)
+                put("phaseName", n.phaseName)
+                put("timestamp", n.timestamp)
+                put("audioFilePath", n.audioFilePath)
+                put("transcription", n.transcription)
+            })
+        }
+        getSharedPreferences("audio_notizen", MODE_PRIVATE)
+            .edit()
+            .putString("notizen", array.toString())
+            .apply()
+    }
+
+    private fun renderAudioNotizen() {
+        val layout = binding.audioNotizenContainer
+        layout.removeAllViews()
+        val notizen = loadAudioNotizen()
+        if (notizen.isEmpty()) {
+            val tv = TextView(this).apply {
+                text = "Noch keine Aufnahmen"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 4, 0, 4)
+            }
+            layout.addView(tv)
+            return
+        }
+        val sdf = SimpleDateFormat("dd.MM. HH:mm", Locale.GERMAN)
+        notizen.reversed().forEach { notiz ->
+            val rowLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 6, 0, 6)
+            }
+            val headerRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val tvInfo = TextView(this).apply {
+                text = "🎙️ ${sdf.format(Date(notiz.timestamp))} · ${notiz.phaseName}"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+                layoutParams = LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+            val btnPlay = Button(this).apply {
+                text = "▶"
+                textSize = 14f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(8, 0, 0, 0) }
+                setPadding(16, 4, 16, 4)
+                setOnClickListener { playAudioNotiz(notiz.audioFilePath) }
+            }
+            headerRow.addView(tvInfo)
+            headerRow.addView(btnPlay)
+            rowLayout.addView(headerRow)
+            if (notiz.transcription.isNotEmpty()) {
+                val tvTranscription = TextView(this).apply {
+                    text = "📝 ${notiz.transcription}"
+                    textSize = 13f
+                    setTextColor(getColor(R.color.text_primary))
+                    setPadding(0, 4, 0, 0)
+                }
+                rowLayout.addView(tvTranscription)
+            }
+            rowLayout.setOnLongClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle("Aufnahme löschen?")
+                    .setMessage("${sdf.format(Date(notiz.timestamp))} – ${notiz.phaseName}")
+                    .setPositiveButton("Löschen") { _, _ ->
+                        deleteAudioNotiz(notiz.id)
+                        renderAudioNotizen()
+                    }
+                    .setNegativeButton("Abbrechen", null)
+                    .show()
+                true
+            }
+            layout.addView(rowLayout)
+            val divider = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1
+                )
+                setBackgroundColor(getColor(R.color.divider))
+            }
+            layout.addView(divider)
+        }
+    }
+
+    private fun playAudioNotiz(filePath: String) {
+        val file = File(filePath)
+        if (!file.exists()) {
+            Toast.makeText(this, "Audiodatei nicht gefunden", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            currentMediaPlayer?.stop()
+            currentMediaPlayer?.release()
+            currentMediaPlayer = MediaPlayer().apply {
+                setDataSource(filePath)
+                prepare()
+                start()
+                setOnCompletionListener {
+                    release()
+                    currentMediaPlayer = null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AudioNotiz", "Playback failed", e)
+            Toast.makeText(this, "Wiedergabe fehlgeschlagen", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     companion object {
-        /** Names of the editable contact entries. Used for export/import. */
         private val EDITABLE_CONTACT_KEYS = listOf(
             "Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
         )
