@@ -632,15 +632,21 @@ class MainActivity : AppCompatActivity() {
                     "${sdf.format(Date(entry.von))} – ${sdf.format(Date(entry.bis))} Uhr"
                 }
                 val icon = if (entry.unbegrenzt) "♾️" else "📅"
+
+                val rowLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, 6, 0, 6)
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
                 val tv = TextView(this).apply {
                     text = "$icon ${entry.name}: $timeText"
                     textSize = 14f
                     setTextColor(getColor(R.color.text_primary))
-                    setPadding(0, 6, 0, 6)
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     setOnLongClickListener {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Eintrag löschen?")
-                            .setMessage("„${entry.name}“ entfernen?")
+                            .setMessage("„${entry.name}" entfernen?")
                             .setPositiveButton("Löschen") { _, _ ->
                                 deleteBetreuungsEintrag(entry.id)
                                 renderBetreuung()
@@ -650,7 +656,26 @@ class MainActivity : AppCompatActivity() {
                         true
                     }
                 }
-                layout.addView(tv)
+                rowLayout.addView(tv)
+                if (entry.phone.isNotEmpty()) {
+                    val btnCall = Button(this).apply {
+                        text = "📞"
+                        textSize = 14f
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { setMargins(8, 0, 0, 0) }
+                        setPadding(16, 4, 16, 4)
+                        setOnClickListener {
+                            val sanitized = entry.phone.replace(Regex("[^0-9+\-*#, ]"), "")
+                            if (sanitized.isNotEmpty()) {
+                                startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$sanitized")))
+                            }
+                        }
+                    }
+                    rowLayout.addView(btnCall)
+                }
+                layout.addView(rowLayout)
             }
         }
 
@@ -669,10 +694,15 @@ class MainActivity : AppCompatActivity() {
             hint = "Name der Betreuungsperson"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
         }
+        val etPhone = EditText(this).apply {
+            hint = "Telefonnummer (optional)"
+            inputType = InputType.TYPE_CLASS_PHONE
+        }
         val btnPickContact = Button(this).apply {
             text = "📇 Aus Kontakten wählen"
         }
         dialogLayout.addView(etName)
+        dialogLayout.addView(etPhone)
         dialogLayout.addView(btnPickContact)
 
         val radioGroup = RadioGroup(this).apply {
@@ -753,7 +783,8 @@ class MainActivity : AppCompatActivity() {
                         name = name,
                         unbegrenzt = unbegrenzt,
                         von = if (unbegrenzt) 0L else vonCalendar.timeInMillis,
-                        bis = if (unbegrenzt) 0L else bisCalendar.timeInMillis
+                        bis = if (unbegrenzt) 0L else bisCalendar.timeInMillis,
+                        phone = etPhone.text.toString().trim()
                     )
                 )
                 renderBetreuung()
@@ -762,8 +793,9 @@ class MainActivity : AppCompatActivity() {
             .show()
 
         btnPickContact.setOnClickListener {
-            pendingContactPickCallback = { name, _ ->
+            pendingContactPickCallback = { name, number ->
                 etName.setText(name)
+                if (number.isNotEmpty()) etPhone.setText(number)
             }
             launchContactPicker()
         }
@@ -805,7 +837,8 @@ class MainActivity : AppCompatActivity() {
                     name = obj.getString("name"),
                     unbegrenzt = obj.getBoolean("unbegrenzt"),
                     von = obj.getLong("von"),
-                    bis = obj.getLong("bis")
+                    bis = obj.getLong("bis"),
+                    phone = obj.optString("phone", "")
                 )
             }
         } catch (e: Exception) {
@@ -835,6 +868,7 @@ class MainActivity : AppCompatActivity() {
                 put("unbegrenzt", e.unbegrenzt)
                 put("von", e.von)
                 put("bis", e.bis)
+                put("phone", e.phone)
             })
         }
         getSharedPreferences("betreuung", MODE_PRIVATE)
@@ -892,7 +926,7 @@ class MainActivity : AppCompatActivity() {
 
     data class Task(val text: String, val done: Boolean)
     data class Contact(val name: String, val number: String, val editable: Boolean = false)
-    data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long)
+    data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long, val phone: String = "")
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
     data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
 
@@ -984,6 +1018,7 @@ class MainActivity : AppCompatActivity() {
                 put("unbegrenzt", e.unbegrenzt)
                 put("von", e.von)
                 put("bis", e.bis)
+                put("phone", e.phone)
             })
         }
         val json = array.toString(2)
@@ -1010,7 +1045,8 @@ class MainActivity : AppCompatActivity() {
                             name = obj.getString("name"),
                             unbegrenzt = obj.getBoolean("unbegrenzt"),
                             von = obj.getLong("von"),
-                            bis = obj.getLong("bis")
+                            bis = obj.getLong("bis"),
+                            phone = obj.optString("phone", "")
                         )
                     }
                     saveAllEintraege(eintraege)
