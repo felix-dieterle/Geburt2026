@@ -15,5 +15,8 @@
     <color name="card_medical">#FFEBEE</color>
     <color name="card_kids">#E8F5E9</color>
     <color name="card_hospital">#FFF8E1</color>
+    <color name="card_wishes">#FCE4EC</color>
+    <color name="card_notes">#F3E5F5</color>
+    <color name="card_labor">#E8F5E9</color>
     <color name="white">#FFFFFF</color>
 </resources>

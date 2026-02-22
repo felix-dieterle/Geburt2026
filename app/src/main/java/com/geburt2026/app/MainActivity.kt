@@ -62,6 +62,9 @@ class MainActivity : AppCompatActivity() {
 
         setupBirthInfo()
         setupMedicalInfo()
+        setupGeburtsWuensche()
+        setupWehenfoerderung()
+        setupNotizen()
         setupKinderInfo()
         setupHospitalInfo()
         setupChecklist()
@@ -136,6 +139,69 @@ class MainActivity : AppCompatActivity() {
             appendLine("• Hep-B-Immunglobulin für Neugeborenes erforderlich")
             appendLine("• Geburtshelfer/Hebamme informiert?")
             append("• Neonatologie Rücksprache empfohlen")
+        }
+    }
+
+    private fun setupGeburtsWuensche() {
+        val wishes = listOf(
+            "Wenig CTG",
+            "Wenig Untersuchungen",
+            "Nabelschnur ausbluten / auspulsieren lassen",
+            "Ambulante Geburt",
+            "Hörtest ggf. gleich nach Geburt",
+        )
+
+        val layout = binding.wishesContainer
+        layout.removeAllViews()
+
+        wishes.forEach { wish ->
+            val tv = TextView(this).apply {
+                text = "• $wish"
+                textSize = 14f
+                setPadding(0, 6, 0, 6)
+                setTextColor(getColor(R.color.text_primary))
+            }
+            layout.addView(tv)
+        }
+    }
+
+    private fun setupWehenfoerderung() {
+        binding.tvWehenfoerderung.text = buildString {
+            appendLine("🚶 Bewegung & Schwerkraft nutzen:")
+            appendLine("  • Spazieren gehen, Treppen steigen")
+            appendLine("  • Auf Geburtsball wippen / kreisen")
+            appendLine("  • Aufrechte Positionen bevorzugen")
+            appendLine("")
+            appendLine("🛁 Wärme & Entspannung:")
+            appendLine("  • Warmes Bad oder Dusche")
+            appendLine("  • Wärmekissen auf Bauch / Kreuz")
+            appendLine("  • Massage, Entspannungsübungen")
+            appendLine("")
+            appendLine("🌿 Natürliche Mittel:")
+            appendLine("  • Rizinus (nach Absprache mit Hebamme)")
+            appendLine("  • Himbeerblatttee")
+            appendLine("  • Akupressur (z. B. Punkt Milz 6)")
+            appendLine("  • Brustwarzen-Stimulation")
+            appendLine("")
+            appendLine("💨 Atemtechniken & mentale Stärke:")
+            appendLine("  • Langsam und tief ausatmen bei Wehen")
+            appendLine("  • Hypnobirthing / Visualisierung")
+            appendLine("  • Vertraute Musik, Ruhe, Kerzenlicht")
+            appendLine("")
+            appendLine("👫 Unterstützung:")
+            appendLine("  • Vater/Begleitung aktiv dabei")
+            appendLine("  • Kontinuierliche Doula-/Hebammenbegleitung")
+            append("  • Wenig Störungen, dunkles ruhiges Zimmer")
+        }
+    }
+
+    private fun setupNotizen() {
+        binding.tvNotizen.text = buildString {
+            appendLine("• Falls Einleitung in Konstanz: Rizinus empfohlen")
+            appendLine("  (kann auch 12h gewartet werden)")
+            appendLine("• Geburt/Einleitung nach Blasensprung:")
+            appendLine("  Paar Tage möglich, wenn Blutwerte gut")
+            append("• Nach 12h darf man nach Hause")
         }
     }
 
