@@ -943,6 +943,58 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Audionotizen Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardAudioNotizen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_audio">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎙️ Audionotizen"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="2dp" />
+
+                <TextView
+                    android:id="@+id/tvAudioNotizPhase"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="8dp" />
+
+                <LinearLayout
+                    android:id="@+id/audioNotizenContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/btnStartAudioNotiz"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="🎙️ Aufnahme starten"
+                    android:textSize="13sp"
+                    android:backgroundTint="@color/primary_dark" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Footer -->
         <TextView
             android:layout_width="match_parent"
