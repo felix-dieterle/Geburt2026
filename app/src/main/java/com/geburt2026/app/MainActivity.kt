@@ -459,7 +459,7 @@ class MainActivity : AppCompatActivity() {
                 resultsLayout.visibility = View.VISIBLE
                 if (matches.isEmpty()) {
                     val tv = TextView(this@MainActivity).apply {
-                        text = "Kein Ergebnis für „$query""
+                        text = "Kein Ergebnis für „$query“"
                         textSize = 13f
                         setPadding(12, 8, 12, 8)
                         setTextColor(getColor(R.color.text_secondary))
@@ -547,7 +547,7 @@ class MainActivity : AppCompatActivity() {
                     setOnLongClickListener {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Eintrag löschen?")
-                            .setMessage("„${entry.name}" entfernen?")
+                            .setMessage("„${entry.name}“ entfernen?")
                             .setPositiveButton("Löschen") { _, _ ->
                                 deleteBetreuungsEintrag(entry.id)
                                 renderBetreuung()
