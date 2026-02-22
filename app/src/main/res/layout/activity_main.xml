@@ -342,6 +342,20 @@
                         android:paddingTop="2dp"
                         android:visibility="gone" />
 
+                    <EditText
+                        android:id="@+id/etEinleitungNotizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_primary"
+                        android:lineSpacingMultiplier="1.4"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:minLines="2"
+                        android:gravity="top"
+                        android:background="@android:color/transparent"
+                        android:hint="Notizen zur Einleitung…" />
+
                 </LinearLayout>
 
                 <View
