@@ -6,10 +6,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.text.InputType
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.geburt2026.app.databinding.ActivityMainBinding
 import java.text.SimpleDateFormat
@@ -278,13 +281,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupContacts() {
+        val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
         val contacts = listOf(
-            Contact("Oma (Sipplinen)", ""),
-            Contact("Hebamme", ""),
+            Contact("Oma (Sipplinen)", prefs.getString("Oma (Sipplinen)", "") ?: "", editable = true),
+            Contact("Hebamme", prefs.getString("Hebamme", "") ?: "", editable = true),
             Contact("KH Konstanz", "0753180100"),
             Contact("KH Singen", "0773189-0"),
             Contact("Notruf", "112"),
-            Contact("Kinderarzt", ""),
+            Contact("Kinderarzt", prefs.getString("Kinderarzt", "") ?: "", editable = true),
+            Contact("Arbeit (Teams)", prefs.getString("Arbeit (Teams)", "") ?: "", editable = true),
+            Contact("Gemeinde (Essen)", prefs.getString("Gemeinde (Essen)", "") ?: "", editable = true),
         )
 
         val layout = binding.contactsContainer
@@ -292,22 +298,56 @@ class MainActivity : AppCompatActivity() {
 
         contacts.forEach { contact ->
             val tv = TextView(this).apply {
-                text = if (contact.number.isNotEmpty()) "📞 ${contact.name}: ${contact.number}"
-                       else "📞 ${contact.name}: (bitte eintragen)"
+                text = when {
+                    contact.number.isNotEmpty() -> "📞 ${contact.name}: ${contact.number}"
+                    contact.editable -> "✏️ ${contact.name}: (tippen zum Eintragen)"
+                    else -> "📞 ${contact.name}"
+                }
                 textSize = 14f
                 setPadding(0, 8, 0, 8)
                 if (contact.number.isNotEmpty()) {
+                    setTextColor(getColor(R.color.link_blue))
                     setOnClickListener {
                         val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${contact.number}"))
                         startActivity(intent)
                     }
-                    setTextColor(getColor(R.color.link_blue))
+                }
+                if (contact.editable) {
+                    if (contact.number.isEmpty()) {
+                        setOnClickListener { showEditContactDialog(contact.name) }
+                    } else {
+                        setOnLongClickListener {
+                            showEditContactDialog(contact.name)
+                            true
+                        }
+                    }
                 }
             }
             layout.addView(tv)
         }
     }
 
+    private fun showEditContactDialog(contactName: String) {
+        val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val currentNumber = prefs.getString(contactName, "") ?: ""
+        val editText = EditText(this).apply {
+            setText(currentNumber)
+            hint = "Telefonnummer eingeben"
+            inputType = InputType.TYPE_CLASS_PHONE
+            setPadding(48, 24, 48, 24)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("📞 $contactName")
+            .setView(editText)
+            .setPositiveButton("Speichern") { _, _ ->
+                val number = editText.text.toString().trim()
+                prefs.edit().putString(contactName, number).apply()
+                setupContacts()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
     data class Task(val text: String, val done: Boolean)
-    data class Contact(val name: String, val number: String)
+    data class Contact(val name: String, val number: String, val editable: Boolean = false)
 }
