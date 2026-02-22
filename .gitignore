@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# IntelliJ IDEA / Android Studio
+*.iml
+.idea/
+*.iws
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Test results
+test-results/
