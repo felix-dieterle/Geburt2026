@@ -3,15 +3,18 @@ package com.geburt2026.app
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.Log
 import android.view.View
+import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -19,6 +22,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
@@ -35,6 +39,43 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private val handler = Handler(Looper.getMainLooper())
+
+    // Callback set before launching the contact picker; receives (displayName, phoneNumber)
+    private var pendingContactPickCallback: ((String, String) -> Unit)? = null
+
+    private val requestContactPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            pickContactLauncher.launch(null)
+        } else {
+            pendingContactPickCallback = null
+            Toast.makeText(this, "Kontakte-Berechtigung verweigert", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val pickContactLauncher = registerForActivityResult(
+        ActivityResultContracts.PickContact()
+    ) { uri ->
+        val callback = pendingContactPickCallback
+        pendingContactPickCallback = null
+        uri ?: return@registerForActivityResult
+        val name = getContactDisplayName(uri)
+        val number = getContactPhoneNumber(uri)
+        callback?.invoke(name, number)
+    }
+
+    private val contactsImportLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { importContacts(it) }
+    }
+
+    private val betreuungImportLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { importBetreuung(it) }
+    }
 
     // Blasensprung: 22.02.2026 um 6:15 Uhr
     private val blasensprungTime: Long = Calendar.getInstance().apply {
@@ -232,6 +273,21 @@ class MainActivity : AppCompatActivity() {
             appendLine("  • Kontinuierliche Doula-/Hebammenbegleitung")
             append("  • Wenig Störungen, dunkles ruhiges Zimmer")
         }
+
+        // Restore collapse state (initially collapsed)
+        val prefs = getSharedPreferences("ui_state", MODE_PRIVATE)
+        val expanded = prefs.getBoolean("wehenfoerderung_expanded", false)
+        binding.tvWehenfoerderung.visibility = if (expanded) View.VISIBLE else View.GONE
+        binding.tvWehenfoerderungHeader.text =
+            "🌿 Wehenförderung & Geburtserleichterung ${if (expanded) "▼" else "▶"}"
+
+        binding.tvWehenfoerderungHeader.setOnClickListener {
+            val nowExpanded = binding.tvWehenfoerderung.visibility == View.VISIBLE
+            binding.tvWehenfoerderung.visibility = if (nowExpanded) View.GONE else View.VISIBLE
+            binding.tvWehenfoerderungHeader.text =
+                "🌿 Wehenförderung & Geburtserleichterung ${if (nowExpanded) "▶" else "▼"}"
+            prefs.edit().putBoolean("wehenfoerderung_expanded", !nowExpanded).apply()
+        }
     }
 
     private fun setupNotizen() {
@@ -361,20 +417,34 @@ class MainActivity : AppCompatActivity() {
             }
             layout.addView(tv)
         }
+
+        binding.btnExportContacts.setOnClickListener { exportContacts() }
+        binding.btnImportContacts.setOnClickListener {
+            contactsImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        }
     }
 
     private fun showEditContactDialog(contactName: String) {
         val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
         val currentNumber = prefs.getString(contactName, "") ?: ""
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 24)
+        }
         val editText = EditText(this).apply {
             setText(currentNumber)
             hint = "Telefonnummer eingeben"
             inputType = InputType.TYPE_CLASS_PHONE
-            setPadding(48, 24, 48, 24)
         }
+        val btnPickContact = Button(this).apply {
+            text = "📇 Aus Kontakten wählen"
+        }
+        dialogLayout.addView(editText)
+        dialogLayout.addView(btnPickContact)
+
         AlertDialog.Builder(this)
             .setTitle("📞 $contactName")
-            .setView(editText)
+            .setView(dialogLayout)
             .setPositiveButton("Speichern") { _, _ ->
                 val number = editText.text.toString().trim()
                 prefs.edit().putString(contactName, number).apply()
@@ -382,6 +452,13 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Abbrechen", null)
             .show()
+
+        btnPickContact.setOnClickListener {
+            pendingContactPickCallback = { _, number ->
+                editText.setText(number)
+            }
+            launchContactPicker()
+        }
     }
 
     private fun setupSearch() {
@@ -430,7 +507,7 @@ class MainActivity : AppCompatActivity() {
                 "📞 Kontakte",
                 {
                     val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
-                    listOf("Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)")
+                    EDITABLE_CONTACT_KEYS
                         .joinToString(" ") { "$it ${prefs.getString(it, "") ?: ""}" } +
                         " KH Konstanz KH Singen Notruf"
                 },
@@ -492,6 +569,10 @@ class MainActivity : AppCompatActivity() {
         renderBetreuung()
         binding.btnAddBetreuung.setOnClickListener {
             showAddBetreuungDialog()
+        }
+        binding.btnExportBetreuung.setOnClickListener { exportBetreuung() }
+        binding.btnImportBetreuung.setOnClickListener {
+            betreuungImportLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
         }
     }
 
@@ -576,7 +657,11 @@ class MainActivity : AppCompatActivity() {
             hint = "Name der Betreuungsperson"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
         }
+        val btnPickContact = Button(this).apply {
+            text = "📇 Aus Kontakten wählen"
+        }
         dialogLayout.addView(etName)
+        dialogLayout.addView(btnPickContact)
 
         val radioGroup = RadioGroup(this).apply {
             orientation = RadioGroup.VERTICAL
@@ -663,6 +748,13 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Abbrechen", null)
             .show()
+
+        btnPickContact.setOnClickListener {
+            pendingContactPickCallback = { name, _ ->
+                etName.setText(name)
+            }
+            launchContactPicker()
+        }
     }
 
     private fun showDateTimePicker(initial: Calendar, onSet: (Calendar) -> Unit) {
@@ -791,4 +883,140 @@ class MainActivity : AppCompatActivity() {
     data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long)
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
     data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
+
+    // ── Contact picker helpers ────────────────────────────────────────────────
+
+    private fun launchContactPicker() {
+        if (checkSelfPermission(android.Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            pickContactLauncher.launch(null)
+        } else {
+            requestContactPermission.launch(android.Manifest.permission.READ_CONTACTS)
+        }
+    }
+
+    private fun getContactDisplayName(uri: Uri): String {
+        contentResolver.query(
+            uri,
+            arrayOf(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY),
+            null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) return cursor.getString(0) ?: ""
+        }
+        return ""
+    }
+
+    private fun getContactPhoneNumber(uri: Uri): String {
+        val id = uri.lastPathSegment ?: return ""
+        contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+            "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+            arrayOf(id), null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val raw = cursor.getString(0) ?: return ""
+                // Keep digits and a leading '+' for international numbers
+                val normalized = buildString {
+                    raw.forEachIndexed { i, c ->
+                        if (c.isDigit() || (c == '+' && i == 0)) append(c)
+                    }
+                }
+                return normalized
+            }
+        }
+        return ""
+    }
+
+    // ── Contacts export / import ──────────────────────────────────────────────
+
+    private fun exportContacts() {
+        val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val obj = JSONObject()
+        EDITABLE_CONTACT_KEYS.forEach { key -> obj.put(key, prefs.getString(key, "") ?: "") }
+        val json = obj.toString(2)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_TEXT, json)
+            putExtra(Intent.EXTRA_SUBJECT, "Geburt2026 Kontakte")
+        }
+        startActivity(Intent.createChooser(intent, "Kontakte exportieren"))
+    }
+
+    private fun importContacts(uri: Uri) {
+        try {
+            val json = contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return
+            val obj = JSONObject(json)
+            val prefs = getSharedPreferences("contacts", MODE_PRIVATE).edit()
+            // Only accept known contact keys to prevent arbitrary data injection
+            EDITABLE_CONTACT_KEYS.forEach { key ->
+                if (obj.has(key)) prefs.putString(key, obj.getString(key))
+            }
+            prefs.apply()
+            setupContacts()
+            Toast.makeText(this, "Kontakte importiert ✓", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("Contacts", "Import failed", e)
+            Toast.makeText(this, "Import fehlgeschlagen", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ── Betreuung export / import ─────────────────────────────────────────────
+
+    private fun exportBetreuung() {
+        val eintraege = loadBetreuungsEintraege()
+        val array = JSONArray()
+        eintraege.forEach { e ->
+            array.put(JSONObject().apply {
+                put("id", e.id)
+                put("name", e.name)
+                put("unbegrenzt", e.unbegrenzt)
+                put("von", e.von)
+                put("bis", e.bis)
+            })
+        }
+        val json = array.toString(2)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_TEXT, json)
+            putExtra(Intent.EXTRA_SUBJECT, "Geburt2026 Betreuungsplaner")
+        }
+        startActivity(Intent.createChooser(intent, "Betreuung exportieren"))
+    }
+
+    private fun importBetreuung(uri: Uri) {
+        AlertDialog.Builder(this)
+            .setTitle("Betreuung importieren")
+            .setMessage("Bestehende Einträge werden überschrieben. Fortfahren?")
+            .setPositiveButton("Ja") { _, _ ->
+                try {
+                    val json = contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return@setPositiveButton
+                    val array = JSONArray(json)
+                    val eintraege = (0 until array.length()).map { i ->
+                        val obj = array.getJSONObject(i)
+                        BetreuungsEintrag(
+                            id = obj.getLong("id"),
+                            name = obj.getString("name"),
+                            unbegrenzt = obj.getBoolean("unbegrenzt"),
+                            von = obj.getLong("von"),
+                            bis = obj.getLong("bis")
+                        )
+                    }
+                    saveAllEintraege(eintraege)
+                    renderBetreuung()
+                    Toast.makeText(this, "Betreuung importiert ✓", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("Betreuung", "Import failed", e)
+                    Toast.makeText(this, "Import fehlgeschlagen", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    companion object {
+        /** Names of the editable contact entries. Used for export/import. */
+        private val EDITABLE_CONTACT_KEYS = listOf(
+            "Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
+        )
+    }
 }

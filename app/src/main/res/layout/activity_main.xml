@@ -342,9 +342,10 @@
                 android:padding="16dp">
 
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvWehenfoerderungHeader"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="🌿 Wehenförderung &amp; Geburtserleichterung"
+                    android:text="🌿 Wehenförderung &amp; Geburtserleichterung ▶"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="@color/primary_dark"
@@ -356,7 +357,8 @@
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
                     android:textColor="@color/text_primary"
-                    android:lineSpacingMultiplier="1.4" />
+                    android:lineSpacingMultiplier="1.4"
+                    android:visibility="gone" />
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -490,6 +492,34 @@
                     android:text="+ Betreuung eintragen"
                     android:textSize="13sp"
                     android:backgroundTint="@color/primary_dark" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="4dp">
+
+                    <Button
+                        android:id="@+id/btnExportBetreuung"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="📤 Exportieren"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnImportBetreuung"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="📥 Importieren"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -636,6 +666,34 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/btnExportContacts"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="📤 Exportieren"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnImportContacts"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="📥 Importieren"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
