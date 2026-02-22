@@ -646,7 +646,7 @@ class MainActivity : AppCompatActivity() {
                     setOnLongClickListener {
                         AlertDialog.Builder(this@MainActivity)
                             .setTitle("Eintrag löschen?")
-                            .setMessage("„${entry.name}" entfernen?")
+                            .setMessage("\"${entry.name}\" entfernen?")
                             .setPositiveButton("Löschen") { _, _ ->
                                 deleteBetreuungsEintrag(entry.id)
                                 renderBetreuung()
@@ -667,7 +667,7 @@ class MainActivity : AppCompatActivity() {
                         ).apply { setMargins(8, 0, 0, 0) }
                         setPadding(16, 4, 16, 4)
                         setOnClickListener {
-                            val sanitized = entry.phone.replace(Regex("[^0-9+\-*#, ]"), "")
+                            val sanitized = entry.phone.replace(Regex("[^0-9+\\-*#, ]"), "")
                             if (sanitized.isNotEmpty()) {
                                 startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$sanitized")))
                             }
