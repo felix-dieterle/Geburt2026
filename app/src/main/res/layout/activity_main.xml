@@ -671,6 +671,15 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
 
+                <Button
+                    android:id="@+id/btnAddWunsch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="➕ Wunsch hinzufügen"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/primary_dark" />
+
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -789,13 +798,32 @@
                     android:lineSpacingMultiplier="1.4"
                     android:paddingBottom="8dp" />
 
-                <Button
-                    android:id="@+id/btnOrganizeTransport"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="🚌 ÖPNV Sipplinen → Singen suchen"
-                    android:textSize="13sp"
-                    android:backgroundTint="@color/primary_dark" />
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnOrganizeTransport"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="🚌 ÖPNV suchen"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnEditKinderInfo"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="✏️ Bearbeiten"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -917,7 +945,8 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="4dp">
 
                     <Button
                         android:id="@+id/btnCallHospital"
@@ -925,7 +954,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginEnd="4dp"
-                        android:text="📞 KH Konstanz anrufen"
+                        android:text="📞 Krankenhaus anrufen"
                         android:textSize="12sp"
                         android:backgroundTint="@color/primary_dark" />
 
@@ -939,6 +968,14 @@
                         android:textSize="12sp"
                         android:backgroundTint="@color/warning_red" />
                 </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnEditHospitalInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="✏️ Krankenhausinfos bearbeiten"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/primary_dark" />
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -1526,6 +1563,70 @@
                     android:text="📋 Zusammenfassung / Urkundenexport"
                     android:textSize="13sp"
                     android:backgroundTint="@color/success_green" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- Einstellungen Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardEinstellungen"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_settings">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚙️ Einstellungen"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="8dp" />
+
+                <Button
+                    android:id="@+id/btnEinstellungen"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⚙️ Grundwerte konfigurieren"
+                    android:textSize="13sp"
+                    android:backgroundTint="@color/primary_dark" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/btnExportAll"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="📤 Alles exportieren"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/success_green" />
+
+                    <Button
+                        android:id="@+id/btnImportAll"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="📥 Alles importieren"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/success_green" />
+
+                </LinearLayout>
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
