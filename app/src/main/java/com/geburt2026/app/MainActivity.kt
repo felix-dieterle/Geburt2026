@@ -129,8 +129,11 @@ class MainActivity : AppCompatActivity() {
     private var wehenRegelStartTime: Long = 0L
 
     // Custom (user-defined) timers
-    private data class CustomTimer(val id: Long, var label: String, var startTime: Long)
+    private data class CustomTimer(val id: Long, var label: String, var startTime: Long, var comment: String = "")
     private val customTimers = mutableListOf<CustomTimer>()
+
+    // Birth date & time (recorded when baby is born)
+    private var geburtszeit: Long = 0L
 
     private val timerRunnable = object : Runnable {
         override fun run() {
@@ -192,6 +195,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupBirthInfo()
+        setupGeburtszeit()
         setupMilestoneTimers()
         setupMedicalInfo()
         setupGeburtsWuensche()
@@ -274,6 +278,48 @@ class MainActivity : AppCompatActivity() {
             blasensprungTime - lmpCal.timeInMillis
         ) % 7
         binding.tvSsw.text = "SSW ${weeksDiff}+${daysDiff} (Frühgeburt)"
+    }
+
+    private fun setupGeburtszeit() {
+        val prefs = getSharedPreferences("geburtszeit", MODE_PRIVATE)
+        geburtszeit = prefs.getLong("timestamp", 0L)
+        updateGeburtszeitDisplay()
+        binding.btnSetGeburtszeit.setOnClickListener {
+            val options = arrayOf("Datum & Uhrzeit wählen", "Zurücksetzen")
+            AlertDialog.Builder(this)
+                .setTitle("👶 Geburtszeit eintragen")
+                .setItems(options) { _, which ->
+                    when (which) {
+                        0 -> {
+                            val initial = if (geburtszeit > 0L) {
+                                Calendar.getInstance().apply { timeInMillis = geburtszeit }
+                            } else {
+                                Calendar.getInstance()
+                            }
+                            showDateTimePicker(initial) { cal ->
+                                geburtszeit = cal.timeInMillis
+                                prefs.edit().putLong("timestamp", geburtszeit).apply()
+                                updateGeburtszeitDisplay()
+                            }
+                        }
+                        1 -> {
+                            geburtszeit = 0L
+                            prefs.edit().putLong("timestamp", 0L).apply()
+                            updateGeburtszeitDisplay()
+                        }
+                    }
+                }
+                .show()
+        }
+    }
+
+    private fun updateGeburtszeitDisplay() {
+        if (geburtszeit > 0L) {
+            val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+            binding.tvGeburtszeit.text = sdf.format(Date(geburtszeit))
+        } else {
+            binding.tvGeburtszeit.text = "–"
+        }
     }
 
     private fun setupMilestoneTimers() {
@@ -477,7 +523,8 @@ class MainActivity : AppCompatActivity() {
                     CustomTimer(
                         id = obj.getLong("id"),
                         label = obj.getString("label"),
-                        startTime = obj.getLong("startTime")
+                        startTime = obj.getLong("startTime"),
+                        comment = obj.optString("comment", "")
                     )
                 )
             }
@@ -493,6 +540,7 @@ class MainActivity : AppCompatActivity() {
             obj.put("id", t.id)
             obj.put("label", t.label)
             obj.put("startTime", t.startTime)
+            obj.put("comment", t.comment)
             arr.put(obj)
         }
         getSharedPreferences("custom_timers", MODE_PRIVATE)
@@ -648,6 +696,27 @@ class MainActivity : AppCompatActivity() {
             }
             timerRow.addView(tvElapsed)
 
+            // Comment/note EditText
+            val etComment = EditText(this).apply {
+                setText(timer.comment)
+                hint = "Kommentar…"
+                textSize = 13f
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                minLines = 1
+                gravity = android.view.Gravity.TOP
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setPadding(0, 6, 0, 0)
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        timer.comment = s?.toString() ?: ""
+                        saveCustomTimers()
+                    }
+                })
+            }
+            timerRow.addView(etComment)
+
             container.addView(timerRow)
 
             // Update elapsed time immediately
@@ -680,6 +749,7 @@ class MainActivity : AppCompatActivity() {
                                     // If selected time is in the future, assume the user meant yesterday
                                     cal.add(Calendar.DAY_OF_YEAR, -1)
                                 }
+                                timer.startTime = cal.timeInMillis
                                 saveCustomTimers()
                                 renderCustomTimers()
                             },
@@ -794,6 +864,26 @@ class MainActivity : AppCompatActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 einleitungPrefs.edit().putString("text", s?.toString() ?: "").apply()
+            }
+        })
+
+        val wehenUnregelPrefs = getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE)
+        binding.etWehenUnregelNotizen.setText(wehenUnregelPrefs.getString("text", ""))
+        binding.etWehenUnregelNotizen.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                wehenUnregelPrefs.edit().putString("text", s?.toString() ?: "").apply()
+            }
+        })
+
+        val wehenRegelPrefs = getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE)
+        binding.etWehenRegelNotizen.setText(wehenRegelPrefs.getString("text", ""))
+        binding.etWehenRegelNotizen.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                wehenRegelPrefs.edit().putString("text", s?.toString() ?: "").apply()
             }
         })
     }
