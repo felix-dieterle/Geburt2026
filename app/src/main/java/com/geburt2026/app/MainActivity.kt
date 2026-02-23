@@ -87,6 +87,12 @@ class MainActivity : AppCompatActivity() {
         uri?.let { importBetreuung(it) }
     }
 
+    private val importAllConfigLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { importAllConfig(it) }
+    }
+
     private val requestCameraPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -145,11 +151,23 @@ class MainActivity : AppCompatActivity() {
     }.timeInMillis
     private var blasensprungTime: Long = blasensprungDefault
 
-    // Errechneter Geburtstermin: 08.03.2026
+    // Errechneter Geburtstermin – loaded from settings, default 08.03.2026
     private val dueDateCalendar: Calendar = Calendar.getInstance().apply {
         set(2026, Calendar.MARCH, 8, 0, 0, 0)
         set(Calendar.MILLISECOND, 0)
     }
+
+    // Configurable warning thresholds (loaded from settings, defaults below)
+    private var blasensprungWarnOrangeH: Int = 18
+    private var blasensprungWarnRedH: Int = 24
+    private var einleitungWarnOrangeH: Int = EINLEITUNG_WARN_ORANGE_H_DEFAULT
+    private var einleitungWarnRedH: Int = EINLEITUNG_WARN_RED_H_DEFAULT
+    private var wehenUnregWarnOrangeH: Int = WEHEN_UNREG_WARN_ORANGE_H_DEFAULT
+    private var wehenUnregWarnRedH: Int = WEHEN_UNREG_WARN_RED_H_DEFAULT
+    private var wehenRegWarnOrangeH: Int = WEHEN_REG_WARN_ORANGE_H_DEFAULT
+    private var wehenRegWarnRedH: Int = WEHEN_REG_WARN_RED_H_DEFAULT
+    private var hospitalCallPhone: String = DEFAULT_HOSPITAL_CALL_PHONE
+    private var opnvUrl: String = DEFAULT_OPNV_URL
 
     // Milestone timer timestamps (0 = not started)
     private var einleitungStartTime: Long = 0L
@@ -181,13 +199,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val geburtswuensche = listOf(
-        "Wenig CTG",
-        "Wenig Untersuchungen",
-        "Nabelschnur ausbluten / auspulsieren lassen",
-        "Ambulante Geburt",
-        "Hörtest ggf. gleich nach Geburt",
-    )
+    private val geburtswuensche = mutableListOf<String>()
 
     private val geburtPhasen: List<GeburtPhase> by lazy {
         listOf(
@@ -235,6 +247,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        loadSettings()
         setupBirthInfo()
         setupGeburtszeit()
         setupMilestoneTimers()
@@ -252,6 +265,7 @@ class MainActivity : AppCompatActivity() {
         setupSearch()
         setupAudioNotizen()
         setupPhasen()
+        setupEinstellungen()
     }
 
     override fun onResume() {
@@ -272,6 +286,44 @@ class MainActivity : AppCompatActivity() {
         currentMediaPlayer = null
     }
 
+    private fun loadSettings() {
+        val prefs = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+        // Due date
+        val defaultDueDateMillis = Calendar.getInstance().apply {
+            set(DEFAULT_DUE_DATE_YEAR, DEFAULT_DUE_DATE_MONTH, DEFAULT_DUE_DATE_DAY, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        dueDateCalendar.timeInMillis = prefs.getLong("due_date_millis", defaultDueDateMillis)
+        // Warning thresholds
+        blasensprungWarnOrangeH = prefs.getInt("blasensprung_warn_orange_h", 18)
+        blasensprungWarnRedH = prefs.getInt("blasensprung_warn_red_h", 24)
+        einleitungWarnOrangeH = prefs.getInt("einleitung_warn_orange_h", EINLEITUNG_WARN_ORANGE_H_DEFAULT)
+        einleitungWarnRedH = prefs.getInt("einleitung_warn_red_h", EINLEITUNG_WARN_RED_H_DEFAULT)
+        wehenUnregWarnOrangeH = prefs.getInt("wehen_unreg_warn_orange_h", WEHEN_UNREG_WARN_ORANGE_H_DEFAULT)
+        wehenUnregWarnRedH = prefs.getInt("wehen_unreg_warn_red_h", WEHEN_UNREG_WARN_RED_H_DEFAULT)
+        wehenRegWarnOrangeH = prefs.getInt("wehen_reg_warn_orange_h", WEHEN_REG_WARN_ORANGE_H_DEFAULT)
+        wehenRegWarnRedH = prefs.getInt("wehen_reg_warn_red_h", WEHEN_REG_WARN_RED_H_DEFAULT)
+        // Contact / navigation
+        hospitalCallPhone = prefs.getString("hospital_call_phone", DEFAULT_HOSPITAL_CALL_PHONE) ?: DEFAULT_HOSPITAL_CALL_PHONE
+        opnvUrl = prefs.getString("opnv_url", DEFAULT_OPNV_URL) ?: DEFAULT_OPNV_URL
+    }
+
+    private fun saveSettings() {
+        getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE).edit()
+            .putLong("due_date_millis", dueDateCalendar.timeInMillis)
+            .putInt("blasensprung_warn_orange_h", blasensprungWarnOrangeH)
+            .putInt("blasensprung_warn_red_h", blasensprungWarnRedH)
+            .putInt("einleitung_warn_orange_h", einleitungWarnOrangeH)
+            .putInt("einleitung_warn_red_h", einleitungWarnRedH)
+            .putInt("wehen_unreg_warn_orange_h", wehenUnregWarnOrangeH)
+            .putInt("wehen_unreg_warn_red_h", wehenUnregWarnRedH)
+            .putInt("wehen_reg_warn_orange_h", wehenRegWarnOrangeH)
+            .putInt("wehen_reg_warn_red_h", wehenRegWarnRedH)
+            .putString("hospital_call_phone", hospitalCallPhone)
+            .putString("opnv_url", opnvUrl)
+            .apply()
+    }
+
     private fun updateBirthTimer() {
         val now = System.currentTimeMillis()
         val elapsed = now - blasensprungTime
@@ -285,16 +337,16 @@ class MainActivity : AppCompatActivity() {
             Locale.GERMAN, "%02d:%02d:%02d", hours, minutes, seconds
         )
 
-        // Medizinischer Hinweis: Nach 18h Blasensprung steigt Infektionsrisiko
+        // Medizinischer Hinweis: Blasensprung-Warnungen
         when {
-            hours >= 24 -> {
+            hours >= blasensprungWarnRedH -> {
                 binding.tvTimerWarning.visibility = View.VISIBLE
-                binding.tvTimerWarning.text = "⚠️ >24h: Erhöhtes Infektionsrisiko – Arzt informieren!"
+                binding.tvTimerWarning.text = "⚠️ >${blasensprungWarnRedH}h: Erhöhtes Infektionsrisiko – Arzt informieren!"
                 binding.tvTimerWarning.setTextColor(getColor(R.color.warning_red))
             }
-            hours >= 18 -> {
+            hours >= blasensprungWarnOrangeH -> {
                 binding.tvTimerWarning.visibility = View.VISIBLE
-                binding.tvTimerWarning.text = "⚠️ >18h: Arzt über Blasensprung-Dauer informieren"
+                binding.tvTimerWarning.text = "⚠️ >${blasensprungWarnOrangeH}h: Arzt über Blasensprung-Dauer informieren"
                 binding.tvTimerWarning.setTextColor(getColor(R.color.warning_orange))
             }
             else -> {
@@ -387,24 +439,24 @@ class MainActivity : AppCompatActivity() {
             binding.tvEinleitungTime,
             binding.tvEinleitungElapsed,
             binding.tvEinleitungWarning,
-            warnOrangeHours = EINLEITUNG_WARN_ORANGE_H, warnOrangeText = EINLEITUNG_WARN_ORANGE_TEXT,
-            warnRedHours = EINLEITUNG_WARN_RED_H, warnRedText = EINLEITUNG_WARN_RED_TEXT
+            warnOrangeHours = einleitungWarnOrangeH, warnOrangeText = ">${einleitungWarnOrangeH}h: Arzt über Einleitungsdauer informieren",
+            warnRedHours = einleitungWarnRedH, warnRedText = ">${einleitungWarnRedH}h: Dringend Arzt kontaktieren!"
         )
         updateMilestoneTimerRow(
             wehenUnregelStartTime,
             binding.tvWehenUnregelTime,
             binding.tvWehenUnregelElapsed,
             binding.tvWehenUnregelWarning,
-            warnOrangeHours = WEHEN_UNREG_WARN_ORANGE_H, warnOrangeText = WEHEN_UNREG_WARN_ORANGE_TEXT,
-            warnRedHours = WEHEN_UNREG_WARN_RED_H, warnRedText = WEHEN_UNREG_WARN_RED_TEXT
+            warnOrangeHours = wehenUnregWarnOrangeH, warnOrangeText = ">${wehenUnregWarnOrangeH}h: Hebamme informieren",
+            warnRedHours = wehenUnregWarnRedH, warnRedText = ">${wehenUnregWarnRedH}h: Arzt / KH kontaktieren!"
         )
         updateMilestoneTimerRow(
             wehenRegelStartTime,
             binding.tvWehenRegelTime,
             binding.tvWehenRegelElapsed,
             binding.tvWehenRegelWarning,
-            warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
-            warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
+            warnOrangeHours = wehenRegWarnOrangeH, warnOrangeText = ">${wehenRegWarnOrangeH}h: KH-Fahrt prüfen",
+            warnRedHours = wehenRegWarnRedH, warnRedText = ">${wehenRegWarnRedH}h: Sofort ins Krankenhaus!"
         )
 
         binding.btnStartEinleitung.setOnClickListener {
@@ -414,8 +466,8 @@ class MainActivity : AppCompatActivity() {
                 updateMilestoneTimerRow(
                     ts, binding.tvEinleitungTime, binding.tvEinleitungElapsed,
                     binding.tvEinleitungWarning,
-                    warnOrangeHours = EINLEITUNG_WARN_ORANGE_H, warnOrangeText = EINLEITUNG_WARN_ORANGE_TEXT,
-                    warnRedHours = EINLEITUNG_WARN_RED_H, warnRedText = EINLEITUNG_WARN_RED_TEXT
+                    warnOrangeHours = einleitungWarnOrangeH, warnOrangeText = ">${einleitungWarnOrangeH}h: Arzt über Einleitungsdauer informieren",
+                    warnRedHours = einleitungWarnRedH, warnRedText = ">${einleitungWarnRedH}h: Dringend Arzt kontaktieren!"
                 )
             }
         }
@@ -426,8 +478,8 @@ class MainActivity : AppCompatActivity() {
                 updateMilestoneTimerRow(
                     ts, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed,
                     binding.tvWehenUnregelWarning,
-                    warnOrangeHours = WEHEN_UNREG_WARN_ORANGE_H, warnOrangeText = WEHEN_UNREG_WARN_ORANGE_TEXT,
-                    warnRedHours = WEHEN_UNREG_WARN_RED_H, warnRedText = WEHEN_UNREG_WARN_RED_TEXT
+                    warnOrangeHours = wehenUnregWarnOrangeH, warnOrangeText = ">${wehenUnregWarnOrangeH}h: Hebamme informieren",
+                    warnRedHours = wehenUnregWarnRedH, warnRedText = ">${wehenUnregWarnRedH}h: Arzt / KH kontaktieren!"
                 )
             }
         }
@@ -438,8 +490,8 @@ class MainActivity : AppCompatActivity() {
                 updateMilestoneTimerRow(
                     ts, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed,
                     binding.tvWehenRegelWarning,
-                    warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
-                    warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
+                    warnOrangeHours = wehenRegWarnOrangeH, warnOrangeText = ">${wehenRegWarnOrangeH}h: KH-Fahrt prüfen",
+                    warnRedHours = wehenRegWarnRedH, warnRedText = ">${wehenRegWarnRedH}h: Sofort ins Krankenhaus!"
                 )
             }
         }
@@ -517,24 +569,24 @@ class MainActivity : AppCompatActivity() {
             binding.tvEinleitungTime,
             binding.tvEinleitungElapsed,
             binding.tvEinleitungWarning,
-            warnOrangeHours = EINLEITUNG_WARN_ORANGE_H, warnOrangeText = EINLEITUNG_WARN_ORANGE_TEXT,
-            warnRedHours = EINLEITUNG_WARN_RED_H, warnRedText = EINLEITUNG_WARN_RED_TEXT
+            warnOrangeHours = einleitungWarnOrangeH, warnOrangeText = ">${einleitungWarnOrangeH}h: Arzt über Einleitungsdauer informieren",
+            warnRedHours = einleitungWarnRedH, warnRedText = ">${einleitungWarnRedH}h: Dringend Arzt kontaktieren!"
         )
         updateMilestoneTimerRow(
             wehenUnregelStartTime,
             binding.tvWehenUnregelTime,
             binding.tvWehenUnregelElapsed,
             binding.tvWehenUnregelWarning,
-            warnOrangeHours = WEHEN_UNREG_WARN_ORANGE_H, warnOrangeText = WEHEN_UNREG_WARN_ORANGE_TEXT,
-            warnRedHours = WEHEN_UNREG_WARN_RED_H, warnRedText = WEHEN_UNREG_WARN_RED_TEXT
+            warnOrangeHours = wehenUnregWarnOrangeH, warnOrangeText = ">${wehenUnregWarnOrangeH}h: Hebamme informieren",
+            warnRedHours = wehenUnregWarnRedH, warnRedText = ">${wehenUnregWarnRedH}h: Arzt / KH kontaktieren!"
         )
         updateMilestoneTimerRow(
             wehenRegelStartTime,
             binding.tvWehenRegelTime,
             binding.tvWehenRegelElapsed,
             binding.tvWehenRegelWarning,
-            warnOrangeHours = WEHEN_REG_WARN_ORANGE_H, warnOrangeText = WEHEN_REG_WARN_ORANGE_TEXT,
-            warnRedHours = WEHEN_REG_WARN_RED_H, warnRedText = WEHEN_REG_WARN_RED_TEXT
+            warnOrangeHours = wehenRegWarnOrangeH, warnOrangeText = ">${wehenRegWarnOrangeH}h: KH-Fahrt prüfen",
+            warnRedHours = wehenRegWarnRedH, warnRedText = ">${wehenRegWarnRedH}h: Sofort ins Krankenhaus!"
         )
         // Update all custom timer elapsed views
         for (timer in customTimers) {
@@ -912,19 +964,99 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun loadGeburtswuensceListe(): List<String> {
+        val prefs = getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE)
+        val json = prefs.getString("items_json", null)
+        if (json != null) {
+            return try {
+                val arr = JSONArray(json)
+                (0 until arr.length()).map { arr.getString(it) }
+            } catch (e: Exception) { emptyList() }
+        }
+        return listOf(
+            "Wenig CTG",
+            "Wenig Untersuchungen",
+            "Nabelschnur ausbluten / auspulsieren lassen",
+            "Ambulante Geburt",
+            "Hörtest ggf. gleich nach Geburt",
+        )
+    }
+
+    private fun saveGeburtswuensche(list: List<String>) {
+        val arr = JSONArray()
+        list.forEach { arr.put(it) }
+        getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE)
+            .edit().putString("items_json", arr.toString()).apply()
+    }
+
     private fun setupGeburtsWuensche() {
+        geburtswuensche.clear()
+        geburtswuensche.addAll(loadGeburtswuensceListe())
+        renderGeburtswuensche()
+        binding.btnAddWunsch.setOnClickListener { showAddWunschDialog() }
+    }
+
+    private fun renderGeburtswuensche() {
         val layout = binding.wishesContainer
         layout.removeAllViews()
-
-        geburtswuensche.forEach { wish ->
-            val tv = TextView(this).apply {
+        geburtswuensche.forEachIndexed { idx, wish ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(0, 0, 0, 4) }
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val tvText = TextView(this).apply {
                 text = "• $wish"
                 textSize = 14f
                 setPadding(0, 6, 0, 6)
                 setTextColor(getColor(R.color.text_primary))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            layout.addView(tv)
+            val btnDelete = Button(this).apply {
+                text = "✕"
+                textSize = 11f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(6, 0, 0, 0) }
+                setOnClickListener {
+                    val currentIdx = geburtswuensche.indexOf(wish)
+                    if (currentIdx >= 0) {
+                        geburtswuensche.removeAt(currentIdx)
+                        saveGeburtswuensche(geburtswuensche)
+                        renderGeburtswuensche()
+                    }
+                }
+            }
+            row.addView(tvText)
+            row.addView(btnDelete)
+            layout.addView(row)
         }
+    }
+
+    private fun showAddWunschDialog() {
+        val editText = EditText(this).apply {
+            hint = "Neuer Wunsch…"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setPadding(48, 24, 48, 8)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("💜 Geburtswunsch hinzufügen")
+            .setView(editText)
+            .setPositiveButton("Hinzufügen") { _, _ ->
+                val text = editText.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    geburtswuensche.add(text)
+                    saveGeburtswuensche(geburtswuensche)
+                    renderGeburtswuensche()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun setupWehenfoerderung() {
@@ -1145,7 +1277,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupKinderInfo() {
-        binding.tvKinderStatus.text = buildString {
+        val prefs = getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE)
+        val defaultText = buildString {
             appendLine("👦 Kind 1: 7 Jahre")
             appendLine("👧 Kind 2: 4 Jahre")
             appendLine("📍 Aktuell: Oma & Opa in Sipplinen")
@@ -1157,16 +1290,47 @@ class MainActivity : AppCompatActivity() {
             appendLine("• Freunde/Nachbarn fragen")
             append("• ÖPNV: Sipplinen – Singen prüfen")
         }
+        val text = prefs.getString("text", defaultText) ?: defaultText
+        binding.tvKinderStatus.text = text
 
         binding.btnOrganizeTransport.setOnClickListener {
-            // ÖPNV-Verbindung suchen
-            val uri = Uri.parse("https://www.bahn.de/buchung/fahrplan/suche#sts=true&so=Sipplinen&zo=Singen+(Htw)&kl=2&r=13:16:KLASSENLOS:1&soid=A%3D1%40L%3D8005762&zoid=A%3D1%40L%3D8005745&soei=8005762&zoei=8005745&hd=2026-02-22T08:00:00")
-            startActivity(Intent(Intent.ACTION_VIEW, uri))
+            val sanitizedUrl = opnvUrl.trim()
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(sanitizedUrl)))
+            } catch (e: Exception) {
+                Toast.makeText(this, "URL konnte nicht geöffnet werden", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        binding.btnEditKinderInfo.setOnClickListener {
+            val currentText = prefs.getString("text", defaultText) ?: defaultText
+            val editText = EditText(this).apply {
+                setText(currentText)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                minLines = 6
+                gravity = android.view.Gravity.TOP
+                setPadding(48, 24, 48, 8)
+            }
+            AlertDialog.Builder(this)
+                .setTitle("👨‍👩‍👧‍👦 Kinder & Transport bearbeiten")
+                .setView(editText)
+                .setPositiveButton("Speichern") { _, _ ->
+                    val newText = editText.text.toString()
+                    prefs.edit().putString("text", newText).apply()
+                    binding.tvKinderStatus.text = newText
+                }
+                .setNegativeButton("Abbrechen", null)
+                .setNeutralButton("Zurücksetzen") { _, _ ->
+                    prefs.edit().remove("text").apply()
+                    binding.tvKinderStatus.text = defaultText
+                }
+                .show()
         }
     }
 
     private fun setupHospitalInfo() {
-        binding.tvHospitalInfo.text = buildString {
+        val prefs = getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE)
+        val defaultText = buildString {
             appendLine("🏥 Hegau-Bodensee-Klinikum Singen")
             appendLine("   📞 Zentrale: 07731 89-0")
             appendLine("   📞 Kreissaal: 07731 89-1710")
@@ -1184,15 +1348,44 @@ class MainActivity : AppCompatActivity() {
             appendLine("👨‍⚕️ Vater ist im Krankenhaus dabei")
             append("📅 Blasensprung: 22.02.2026, 06:15 Uhr")
         }
+        val text = prefs.getString("text", defaultText) ?: defaultText
+        binding.tvHospitalInfo.text = text
 
         binding.btnCallHospital.setOnClickListener {
-            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:0753180100"))
-            startActivity(intent)
+            val sanitized = hospitalCallPhone.replace(Regex("[^0-9+\\-*#, ]"), "")
+            if (sanitized.isNotEmpty()) {
+                startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$sanitized")))
+            }
         }
 
         binding.btnCallEmergency.setOnClickListener {
             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
             startActivity(intent)
+        }
+
+        binding.btnEditHospitalInfo.setOnClickListener {
+            val currentText = prefs.getString("text", defaultText) ?: defaultText
+            val editText = EditText(this).apply {
+                setText(currentText)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                minLines = 6
+                gravity = android.view.Gravity.TOP
+                setPadding(48, 24, 48, 8)
+            }
+            AlertDialog.Builder(this)
+                .setTitle("🏥 Krankenhausinfos bearbeiten")
+                .setView(editText)
+                .setPositiveButton("Speichern") { _, _ ->
+                    val newText = editText.text.toString()
+                    prefs.edit().putString("text", newText).apply()
+                    binding.tvHospitalInfo.text = newText
+                }
+                .setNegativeButton("Abbrechen", null)
+                .setNeutralButton("Zurücksetzen") { _, _ ->
+                    prefs.edit().remove("text").apply()
+                    binding.tvHospitalInfo.text = defaultText
+                }
+                .show()
         }
     }
 
@@ -2560,30 +2753,438 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Einstellungen ─────────────────────────────────────────────────────────
+
+    private fun setupEinstellungen() {
+        binding.btnEinstellungen.setOnClickListener { showSettingsDialog() }
+        binding.btnExportAll.setOnClickListener { exportAllConfig() }
+        binding.btnImportAll.setOnClickListener {
+            importAllConfigLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        }
+    }
+
+    private fun showSettingsDialog() {
+        val sdfDate = SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN)
+        val dialogLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 24)
+        }
+
+        fun addLabel(text: String) {
+            dialogLayout.addView(TextView(this).apply {
+                this.text = text
+                textSize = 13f
+                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTextColor(getColor(R.color.primary_dark))
+                setPadding(0, 16, 0, 4)
+            })
+        }
+
+        fun addNumberField(label: String, currentValue: Int): EditText {
+            addLabel(label)
+            return EditText(this).apply {
+                setText(currentValue.toString())
+                inputType = InputType.TYPE_CLASS_NUMBER
+                textSize = 14f
+                dialogLayout.addView(this)
+            }
+        }
+
+        fun addTextField(label: String, currentValue: String): EditText {
+            addLabel(label)
+            return EditText(this).apply {
+                setText(currentValue)
+                inputType = InputType.TYPE_CLASS_TEXT
+                textSize = 14f
+                dialogLayout.addView(this)
+            }
+        }
+
+        // Due date clickable
+        addLabel("📅 Errechneter Geburtstermin")
+        val tvDueDate = TextView(this).apply {
+            text = sdfDate.format(dueDateCalendar.time)
+            textSize = 14f
+            setTextColor(getColor(R.color.link_blue))
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setPadding(0, 4, 0, 4)
+        }
+        var tempDueDateCal = dueDateCalendar.clone() as Calendar
+        tvDueDate.setOnClickListener {
+            showDateTimePicker(tempDueDateCal) { cal ->
+                tempDueDateCal = cal
+                tvDueDate.text = sdfDate.format(cal.time)
+            }
+        }
+        dialogLayout.addView(tvDueDate)
+
+        addLabel("⏱️ Blasensprung-Warnung Orange (Stunden)")
+        val etBsOrange = addNumberField("", blasensprungWarnOrangeH)
+        addLabel("⏱️ Blasensprung-Warnung Rot (Stunden)")
+        val etBsRed = addNumberField("", blasensprungWarnRedH)
+
+        addLabel("🔔 Einleitung Warnung Orange (Stunden)")
+        val etElOrange = addNumberField("", einleitungWarnOrangeH)
+        addLabel("🔔 Einleitung Warnung Rot (Stunden)")
+        val etElRed = addNumberField("", einleitungWarnRedH)
+
+        addLabel("🌊 Wehen unregelm. Warnung Orange (Stunden)")
+        val etWuOrange = addNumberField("", wehenUnregWarnOrangeH)
+        addLabel("🌊 Wehen unregelm. Warnung Rot (Stunden)")
+        val etWuRed = addNumberField("", wehenUnregWarnRedH)
+
+        addLabel("⚡ Wehen regelm. Warnung Orange (Stunden)")
+        val etWrOrange = addNumberField("", wehenRegWarnOrangeH)
+        addLabel("⚡ Wehen regelm. Warnung Rot (Stunden)")
+        val etWrRed = addNumberField("", wehenRegWarnRedH)
+
+        val etHospitalPhone = addTextField("📞 Krankenhaus-Rufnummer (für Anruf-Button)", hospitalCallPhone)
+        val etOpnvUrl = addTextField("🚌 ÖPNV-URL (für Transport-Button)", opnvUrl)
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(dialogLayout)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("⚙️ Einstellungen")
+            .setView(scrollView)
+            .setPositiveButton("Speichern") { _, _ ->
+                dueDateCalendar.timeInMillis = tempDueDateCal.timeInMillis
+                blasensprungWarnOrangeH = etBsOrange.text.toString().toIntOrNull() ?: blasensprungWarnOrangeH
+                blasensprungWarnRedH = etBsRed.text.toString().toIntOrNull() ?: blasensprungWarnRedH
+                einleitungWarnOrangeH = etElOrange.text.toString().toIntOrNull() ?: einleitungWarnOrangeH
+                einleitungWarnRedH = etElRed.text.toString().toIntOrNull() ?: einleitungWarnRedH
+                wehenUnregWarnOrangeH = etWuOrange.text.toString().toIntOrNull() ?: wehenUnregWarnOrangeH
+                wehenUnregWarnRedH = etWuRed.text.toString().toIntOrNull() ?: wehenUnregWarnRedH
+                wehenRegWarnOrangeH = etWrOrange.text.toString().toIntOrNull() ?: wehenRegWarnOrangeH
+                wehenRegWarnRedH = etWrRed.text.toString().toIntOrNull() ?: wehenRegWarnRedH
+                hospitalCallPhone = etHospitalPhone.text.toString().trim()
+                opnvUrl = etOpnvUrl.text.toString().trim()
+                saveSettings()
+                // Refresh due date and SSW display
+                val sdfD = SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN)
+                binding.tvDueDate.text = sdfD.format(dueDateCalendar.time)
+                val lmpCal = dueDateCalendar.clone() as Calendar
+                lmpCal.add(Calendar.DAY_OF_YEAR, -280)
+                val totalDaysFromLmp = TimeUnit.MILLISECONDS.toDays(blasensprungTime - lmpCal.timeInMillis)
+                binding.tvSsw.text = "SSW ${totalDaysFromLmp / 7}+${totalDaysFromLmp % 7}"
+                Toast.makeText(this, "Einstellungen gespeichert ✓", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    // ── Gesamt-Export / Import ────────────────────────────────────────────────
+
+    private fun exportAllConfig() {
+        try {
+            val root = JSONObject()
+
+            // Settings
+            val settingsPrefs = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+            val settingsObj = JSONObject()
+            settingsPrefs.all.forEach { (k, v) -> settingsObj.put(k, v) }
+            root.put("einstellungen", settingsObj)
+
+            // Blasensprung
+            val bsPrefs = getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE)
+            root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", blasensprungDefault))
+
+            // Geburtszeit
+            val gzPrefs = getSharedPreferences("geburtszeit", MODE_PRIVATE)
+            root.put("geburtszeit_timestamp", gzPrefs.getLong("timestamp", 0L))
+
+            // Milestones
+            val msPrefs = getSharedPreferences("milestones", MODE_PRIVATE)
+            root.put("einleitung_start", msPrefs.getLong("einleitung", 0L))
+            root.put("wehen_unreg_start", msPrefs.getLong("wehen_unregelmaessig", 0L))
+            root.put("wehen_reg_start", msPrefs.getLong("wehen_regelmaessig", 0L))
+
+            // Phasen
+            val phasenPrefs = getSharedPreferences("phasen", MODE_PRIVATE)
+            root.put("current_phase", phasenPrefs.getInt("currentPhase", 0))
+
+            // Custom timers
+            val ctPrefs = getSharedPreferences("custom_timers", MODE_PRIVATE)
+            root.put("custom_timers", JSONArray(ctPrefs.getString("timers_json", "[]") ?: "[]"))
+
+            // Medical items
+            val medPrefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+            root.put("medical_items", JSONArray(medPrefs.getString("items_json", "[]") ?: "[]"))
+
+            // Notizen list
+            val notPrefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+            root.put("notizen_items", JSONArray(notPrefs.getString("items_json", "[]") ?: "[]"))
+
+            // Inline notes
+            val einleitungNotes = getSharedPreferences("einleitung_notizen", MODE_PRIVATE)
+            root.put("einleitung_notizen", einleitungNotes.getString("text", "") ?: "")
+            val wehenUnregNotes = getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE)
+            root.put("wehen_unreg_notizen", wehenUnregNotes.getString("text", "") ?: "")
+            val wehenRegNotes = getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE)
+            root.put("wehen_reg_notizen", wehenRegNotes.getString("text", "") ?: "")
+
+            // Checklist
+            val checkPrefs = getSharedPreferences("checklist", MODE_PRIVATE)
+            root.put("checklist", JSONArray(checkPrefs.getString("tasks", "[]") ?: "[]"))
+
+            // Contacts
+            val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+            val contactObj = JSONObject()
+            EDITABLE_CONTACT_KEYS.forEach { key -> contactObj.put(key, contactPrefs.getString(key, "") ?: "") }
+            root.put("contacts", contactObj)
+
+            // Betreuung
+            val betrPrefs = getSharedPreferences("betreuung", MODE_PRIVATE)
+            root.put("betreuung", JSONArray(betrPrefs.getString("eintraege", "[]") ?: "[]"))
+
+            // Eckdaten
+            val eckPrefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+            val eckObj = JSONObject()
+            listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "apgar_1", "apgar_5", "apgar_10", "geburtsart", "geburtsort", "blutgruppe", "notizen")
+                .forEach { key -> eckObj.put(key, eckPrefs.getString(key, "") ?: "") }
+            root.put("eckdaten", eckObj)
+
+            // Geburtswünsche
+            root.put("geburtswuensche", JSONArray(
+                getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE).getString("items_json", "[]") ?: "[]"
+            ))
+
+            // KinderInfo
+            val kinderPrefs = getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE)
+            root.put("kinder_info", kinderPrefs.getString("text", "") ?: "")
+
+            // HospitalInfo
+            val hospitalPrefs = getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE)
+            root.put("hospital_info", hospitalPrefs.getString("text", "") ?: "")
+
+            // Audio notizen metadata
+            val audioPrefs = getSharedPreferences("audio_notizen", MODE_PRIVATE)
+            root.put("audio_notizen", JSONArray(audioPrefs.getString("notizen", "[]") ?: "[]"))
+
+            val json = root.toString(2)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(Intent.EXTRA_TEXT, json)
+                putExtra(Intent.EXTRA_SUBJECT, "Geburt2026 – Gesamtkonfiguration")
+            }
+            startActivity(Intent.createChooser(intent, "Konfiguration exportieren"))
+        } catch (e: Exception) {
+            Log.e("ExportAll", "Export failed", e)
+            Toast.makeText(this, "Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun importAllConfig(uri: Uri) {
+        AlertDialog.Builder(this)
+            .setTitle("📥 Alles importieren")
+            .setMessage("Alle bestehenden Konfigurationen werden überschrieben. Fortfahren?")
+            .setPositiveButton("Ja") { _, _ ->
+                try {
+                    val json = contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return@setPositiveButton
+                    val root = JSONObject(json)
+
+                    // Settings
+                    if (root.has("einstellungen")) {
+                        val s = root.getJSONObject("einstellungen")
+                        val sp = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE).edit()
+                        if (s.has("due_date_millis")) sp.putLong("due_date_millis", s.getLong("due_date_millis"))
+                        if (s.has("blasensprung_warn_orange_h")) sp.putInt("blasensprung_warn_orange_h", s.getInt("blasensprung_warn_orange_h"))
+                        if (s.has("blasensprung_warn_red_h")) sp.putInt("blasensprung_warn_red_h", s.getInt("blasensprung_warn_red_h"))
+                        if (s.has("einleitung_warn_orange_h")) sp.putInt("einleitung_warn_orange_h", s.getInt("einleitung_warn_orange_h"))
+                        if (s.has("einleitung_warn_red_h")) sp.putInt("einleitung_warn_red_h", s.getInt("einleitung_warn_red_h"))
+                        if (s.has("wehen_unreg_warn_orange_h")) sp.putInt("wehen_unreg_warn_orange_h", s.getInt("wehen_unreg_warn_orange_h"))
+                        if (s.has("wehen_unreg_warn_red_h")) sp.putInt("wehen_unreg_warn_red_h", s.getInt("wehen_unreg_warn_red_h"))
+                        if (s.has("wehen_reg_warn_orange_h")) sp.putInt("wehen_reg_warn_orange_h", s.getInt("wehen_reg_warn_orange_h"))
+                        if (s.has("wehen_reg_warn_red_h")) sp.putInt("wehen_reg_warn_red_h", s.getInt("wehen_reg_warn_red_h"))
+                        if (s.has("hospital_call_phone")) sp.putString("hospital_call_phone", s.getString("hospital_call_phone"))
+                        if (s.has("opnv_url")) sp.putString("opnv_url", s.getString("opnv_url"))
+                        sp.apply()
+                        loadSettings()
+                    }
+
+                    // Blasensprung
+                    if (root.has("blasensprung_timestamp")) {
+                        val ts = root.getLong("blasensprung_timestamp")
+                        getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE).edit().putLong("timestamp", ts).apply()
+                        blasensprungTime = ts
+                    }
+
+                    // Geburtszeit
+                    if (root.has("geburtszeit_timestamp")) {
+                        val ts = root.getLong("geburtszeit_timestamp")
+                        getSharedPreferences("geburtszeit", MODE_PRIVATE).edit().putLong("timestamp", ts).apply()
+                        geburtszeit = ts
+                    }
+
+                    // Milestones
+                    val msEditor = getSharedPreferences("milestones", MODE_PRIVATE).edit()
+                    if (root.has("einleitung_start")) { val v = root.getLong("einleitung_start"); einleitungStartTime = v; msEditor.putLong("einleitung", v) }
+                    if (root.has("wehen_unreg_start")) { val v = root.getLong("wehen_unreg_start"); wehenUnregelStartTime = v; msEditor.putLong("wehen_unregelmaessig", v) }
+                    if (root.has("wehen_reg_start")) { val v = root.getLong("wehen_reg_start"); wehenRegelStartTime = v; msEditor.putLong("wehen_regelmaessig", v) }
+                    msEditor.apply()
+
+                    // Phasen
+                    if (root.has("current_phase")) {
+                        val idx = root.getInt("current_phase")
+                        getSharedPreferences("phasen", MODE_PRIVATE).edit().putInt("currentPhase", idx).apply()
+                        currentPhaseIndex = idx
+                    }
+
+                    // Custom timers
+                    if (root.has("custom_timers")) {
+                        getSharedPreferences("custom_timers", MODE_PRIVATE).edit()
+                            .putString("timers_json", root.getJSONArray("custom_timers").toString()).apply()
+                        customTimers.clear()
+                        loadCustomTimers()
+                    }
+
+                    // Medical items
+                    if (root.has("medical_items")) {
+                        getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE).edit()
+                            .putString("items_json", root.getJSONArray("medical_items").toString()).apply()
+                        loadMedicalItemsIntoMemory()
+                    }
+
+                    // Notizen list
+                    if (root.has("notizen_items")) {
+                        getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE).edit()
+                            .putString("items_json", root.getJSONArray("notizen_items").toString()).apply()
+                        loadNotizenItemsIntoMemory()
+                    }
+
+                    // Inline notes
+                    if (root.has("einleitung_notizen")) {
+                        val t = root.getString("einleitung_notizen")
+                        getSharedPreferences("einleitung_notizen", MODE_PRIVATE).edit().putString("text", t).apply()
+                        binding.etEinleitungNotizen.setText(t)
+                    }
+                    if (root.has("wehen_unreg_notizen")) {
+                        val t = root.getString("wehen_unreg_notizen")
+                        getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE).edit().putString("text", t).apply()
+                        binding.etWehenUnregelNotizen.setText(t)
+                    }
+                    if (root.has("wehen_reg_notizen")) {
+                        val t = root.getString("wehen_reg_notizen")
+                        getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE).edit().putString("text", t).apply()
+                        binding.etWehenRegelNotizen.setText(t)
+                    }
+
+                    // Checklist
+                    if (root.has("checklist")) {
+                        getSharedPreferences("checklist", MODE_PRIVATE).edit()
+                            .putString("tasks", root.getJSONArray("checklist").toString()).apply()
+                        tasks.clear()
+                        tasks.addAll(loadTasks())
+                    }
+
+                    // Contacts
+                    if (root.has("contacts")) {
+                        val contactObj = root.getJSONObject("contacts")
+                        val sp = getSharedPreferences("contacts", MODE_PRIVATE).edit()
+                        EDITABLE_CONTACT_KEYS.forEach { key ->
+                            if (contactObj.has(key)) sp.putString(key, contactObj.getString(key))
+                        }
+                        sp.apply()
+                    }
+
+                    // Betreuung
+                    if (root.has("betreuung")) {
+                        getSharedPreferences("betreuung", MODE_PRIVATE).edit()
+                            .putString("eintraege", root.getJSONArray("betreuung").toString()).apply()
+                    }
+
+                    // Eckdaten
+                    if (root.has("eckdaten")) {
+                        val eckObj = root.getJSONObject("eckdaten")
+                        val sp = getSharedPreferences("eckdaten", MODE_PRIVATE).edit()
+                        listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "apgar_1", "apgar_5", "apgar_10", "geburtsart", "geburtsort", "blutgruppe", "notizen")
+                            .forEach { key -> if (eckObj.has(key)) sp.putString(key, eckObj.getString(key)) }
+                        sp.apply()
+                    }
+
+                    // Geburtswünsche
+                    if (root.has("geburtswuensche")) {
+                        getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE).edit()
+                            .putString("items_json", root.getJSONArray("geburtswuensche").toString()).apply()
+                        geburtswuensche.clear()
+                        geburtswuensche.addAll(loadGeburtswuensceListe())
+                    }
+
+                    // KinderInfo
+                    if (root.has("kinder_info")) {
+                        getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE).edit()
+                            .putString("text", root.getString("kinder_info")).apply()
+                    }
+
+                    // HospitalInfo
+                    if (root.has("hospital_info")) {
+                        getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE).edit()
+                            .putString("text", root.getString("hospital_info")).apply()
+                    }
+
+                    // Audio notizen metadata
+                    if (root.has("audio_notizen")) {
+                        getSharedPreferences("audio_notizen", MODE_PRIVATE).edit()
+                            .putString("notizen", root.getJSONArray("audio_notizen").toString()).apply()
+                    }
+
+                    // Refresh all UI
+                    setupBirthInfo()
+                    updateGeburtszeitDisplay()
+                    setupMilestoneTimers()
+                    renderMedicalItems()
+                    renderNotizenItems()
+                    renderGeburtswuensche()
+                    renderCustomTimers()
+                    setupChecklist()
+                    setupContacts()
+                    setupEckdaten()
+                    renderBetreuung()
+                    renderAudioNotizen()
+                    applyPhase(currentPhaseIndex)
+                    setupKinderInfo()
+                    setupHospitalInfo()
+
+                    Toast.makeText(this, "Import erfolgreich ✓", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("ImportAll", "Import failed", e)
+                    Toast.makeText(this, "Import fehlgeschlagen: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
     companion object {
         private val EDITABLE_CONTACT_KEYS = listOf(
             "Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
         )
 
-        // Milestone timer warning thresholds (hours) and messages
-        private const val EINLEITUNG_WARN_ORANGE_H = 12
-        private const val EINLEITUNG_WARN_ORANGE_TEXT = ">12h: Arzt über Einleitungsdauer informieren"
-        private const val EINLEITUNG_WARN_RED_H = 24
-        private const val EINLEITUNG_WARN_RED_TEXT = ">24h: Dringend Arzt kontaktieren!"
+        // Default values for milestone warning thresholds (hours)
+        private const val EINLEITUNG_WARN_ORANGE_H_DEFAULT = 12
+        private const val EINLEITUNG_WARN_RED_H_DEFAULT = 24
 
-        private const val WEHEN_UNREG_WARN_ORANGE_H = 8
-        private const val WEHEN_UNREG_WARN_ORANGE_TEXT = ">8h: Hebamme informieren"
-        private const val WEHEN_UNREG_WARN_RED_H = 12
-        private const val WEHEN_UNREG_WARN_RED_TEXT = ">12h: Arzt / KH kontaktieren!"
+        private const val WEHEN_UNREG_WARN_ORANGE_H_DEFAULT = 8
+        private const val WEHEN_UNREG_WARN_RED_H_DEFAULT = 12
 
-        private const val WEHEN_REG_WARN_ORANGE_H = 4
-        private const val WEHEN_REG_WARN_ORANGE_TEXT = ">4h: KH-Fahrt prüfen"
-        private const val WEHEN_REG_WARN_RED_H = 8
-        private const val WEHEN_REG_WARN_RED_TEXT = ">8h: Sofort ins Krankenhaus!"
+        private const val WEHEN_REG_WARN_ORANGE_H_DEFAULT = 4
+        private const val WEHEN_REG_WARN_RED_H_DEFAULT = 8
+
+        private const val DEFAULT_HOSPITAL_CALL_PHONE = "0753180100"
+        private const val DEFAULT_OPNV_URL =
+            "https://www.bahn.de/buchung/fahrplan/suche#sts=true&so=Sipplinen&zo=Singen+(Htw)&kl=2&r=13:16:KLASSENLOS:1&soid=A%3D1%40L%3D8005762&zoid=A%3D1%40L%3D8005745&soei=8005762&zoei=8005745&hd=2026-02-22T08:00:00"
+        private const val DEFAULT_DUE_DATE_YEAR = 2026
+        private const val DEFAULT_DUE_DATE_MONTH = 2 // Calendar.MARCH = 2
+        private const val DEFAULT_DUE_DATE_DAY = 8
 
         private const val PREFS_BLASENSPRUNG = "blasensprung"
         private const val PREFS_NOTIZEN_LIST = "notizen_list"
         private const val PREFS_MEDICAL_LIST = "medical_list"
         private const val PREFS_PHOTOS = "photos"
+        private const val PREFS_SETTINGS = "einstellungen"
+        private const val PREFS_KINDER_INFO = "kinder_info"
+        private const val PREFS_HOSPITAL_INFO = "hospital_info"
+        private const val PREFS_GEBURTSWUENSCHE = "geburtswuensche"
     }
 }
