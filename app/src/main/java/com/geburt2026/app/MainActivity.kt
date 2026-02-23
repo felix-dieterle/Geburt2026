@@ -5,6 +5,7 @@ import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
@@ -22,6 +23,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -31,10 +33,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
+import androidx.core.content.FileProvider
 import com.geburt2026.app.databinding.ActivityMainBinding
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -81,6 +85,29 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let { importBetreuung(it) }
+    }
+
+    private val requestCameraPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) launchCamera() else Toast.makeText(this, "Kamera-Berechtigung verweigert", Toast.LENGTH_SHORT).show()
+    }
+
+    private val takePhotoLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && currentCameraPhotoPath.isNotEmpty()) {
+            photoPaths.add(currentCameraPhotoPath)
+            savePhotoPaths()
+            renderPhotos()
+            currentCameraPhotoPath = ""
+        }
+    }
+
+    private val pickPhotoLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { copyPhotoToInternalStorage(it) }
     }
 
     // ── Audio recording fields ─────────────────────────────────────────────────
@@ -136,6 +163,13 @@ class MainActivity : AppCompatActivity() {
     // Editable notes list (in-memory backing)
     private val notizenItems = mutableListOf<Pair<Long, String>>()
 
+    // Editable medical hints list (in-memory backing)
+    private val medicalItems = mutableListOf<Pair<Long, String>>()
+
+    // Photos list (absolute file paths stored in app-internal storage)
+    private val photoPaths = mutableListOf<String>()
+    private var currentCameraPhotoPath: String = ""
+
     // Birth date & time (recorded when baby is born)
     private var geburtszeit: Long = 0L
 
@@ -171,6 +205,9 @@ class MainActivity : AppCompatActivity() {
             },
             GeburtPhase("🍼", "Nachgeburtsphase", "Hep-B-Impfung, erste Stunden, Nachgeburt") { b ->
                 listOf(b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
+            },
+            GeburtPhase("🏠", "Erste Tage Zuhause", "Ankommen – Wochenbett & Familie") { b ->
+                listOf(b.cardEckdaten, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardNotes, b.cardAudioNotizen)
             },
         )
     }
@@ -751,14 +788,128 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupMedicalInfo() {
-        // Hep B Hinweise für Geburtsklinik
-        binding.tvHepBInfo.text = buildString {
-            appendLine("• Mutter: Chron. Hepatitis B, niederschwellig aktiv")
-            appendLine("• Neugeborenes: Hep-B-Simultanimpfung direkt nach Geburt!")
-            appendLine("• Hep-B-Immunglobulin für Neugeborenes erforderlich")
-            appendLine("• Geburtshelfer/Hebamme informiert?")
-            append("• Neonatologie Rücksprache empfohlen")
+        val prefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        if (!prefs.contains("items_json")) {
+            val defaultItems = listOf(
+                "Mutter: Chron. Hepatitis B, niederschwellig aktiv",
+                "Neugeborenes: Hep-B-Simultanimpfung direkt nach Geburt!",
+                "Hep-B-Immunglobulin für Neugeborenes erforderlich",
+                "Geburtshelfer/Hebamme informiert?",
+                "Neonatologie Rücksprache empfohlen"
+            )
+            val arr = JSONArray()
+            defaultItems.forEachIndexed { i, text ->
+                val obj = JSONObject()
+                obj.put("id", System.currentTimeMillis() + i)
+                obj.put("text", text)
+                arr.put(obj)
+            }
+            prefs.edit().putString("items_json", arr.toString()).apply()
         }
+        loadMedicalItemsIntoMemory()
+        renderMedicalItems()
+        binding.btnAddMedical.setOnClickListener { addMedicalItem() }
+    }
+
+    private fun loadMedicalItemsIntoMemory() {
+        val prefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        val json = prefs.getString("items_json", "[]") ?: "[]"
+        medicalItems.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                medicalItems.add(Pair(obj.getLong("id"), obj.getString("text")))
+            }
+        } catch (e: Exception) {
+            Log.w("Medical", "Failed to load medical items", e)
+        }
+    }
+
+    private fun saveMedicalItems() {
+        val arr = JSONArray()
+        medicalItems.forEach { (id, text) ->
+            val obj = JSONObject()
+            obj.put("id", id)
+            obj.put("text", text)
+            arr.put(obj)
+        }
+        getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+            .edit().putString("items_json", arr.toString()).apply()
+    }
+
+    private fun renderMedicalItems() {
+        val container = binding.llMedicalList
+        container.removeAllViews()
+        medicalItems.forEach { (id, text) ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(0, 0, 0, 6) }
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val etText = EditText(this).apply {
+                setText(text)
+                textSize = 14f
+                setTextColor(getColor(R.color.text_primary))
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                minLines = 1
+                gravity = android.view.Gravity.TOP
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        val idx = medicalItems.indexOfFirst { it.first == id }
+                        if (idx >= 0) {
+                            medicalItems[idx] = Pair(id, s?.toString() ?: "")
+                            saveMedicalItems()
+                        }
+                    }
+                })
+            }
+            val btnDelete = Button(this).apply {
+                this.text = "✕"
+                textSize = 11f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(6, 0, 0, 0) }
+                setOnClickListener {
+                    medicalItems.removeAll { it.first == id }
+                    saveMedicalItems()
+                    renderMedicalItems()
+                }
+            }
+            row.addView(etText)
+            row.addView(btnDelete)
+            container.addView(row)
+        }
+    }
+
+    private fun addMedicalItem() {
+        val editText = EditText(this).apply {
+            hint = "Neuer Hinweis…"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setPadding(48, 24, 48, 8)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Medizinischen Hinweis hinzufügen")
+            .setView(editText)
+            .setPositiveButton("Hinzufügen") { _, _ ->
+                val noteText = editText.text.toString().trim()
+                if (noteText.isNotEmpty()) {
+                    medicalItems.add(Pair(System.currentTimeMillis(), noteText))
+                    saveMedicalItems()
+                    renderMedicalItems()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun setupGeburtsWuensche() {
@@ -1299,7 +1450,137 @@ class MainActivity : AppCompatActivity() {
         saveField("blutgruppe", binding.etBlutgruppe)
         saveField("notizen", binding.etEckdatenNotizen)
 
+        setupPhotos()
         binding.btnExportUrkunde.setOnClickListener { exportUrkunde() }
+    }
+
+    private fun setupPhotos() {
+        loadPhotoPathsIntoMemory()
+        renderPhotos()
+        binding.btnTakePhoto.setOnClickListener {
+            if (checkSelfPermission(android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                launchCamera()
+            } else {
+                requestCameraPermission.launch(android.Manifest.permission.CAMERA)
+            }
+        }
+        binding.btnPickPhoto.setOnClickListener {
+            pickPhotoLauncher.launch("image/*")
+        }
+    }
+
+    private fun launchCamera() {
+        val photoDir = File(filesDir, "photos").also { it.mkdirs() }
+        val photoFile = File(photoDir, "photo_${System.currentTimeMillis()}.jpg")
+        currentCameraPhotoPath = photoFile.absolutePath
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", photoFile)
+        takePhotoLauncher.launch(uri)
+    }
+
+    private fun copyPhotoToInternalStorage(uri: Uri) {
+        try {
+            val photoDir = File(filesDir, "photos").also { it.mkdirs() }
+            val destFile = File(photoDir, "photo_${System.currentTimeMillis()}.jpg")
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(destFile).use { output -> input.copyTo(output) }
+            }
+            photoPaths.add(destFile.absolutePath)
+            savePhotoPaths()
+            renderPhotos()
+        } catch (e: Exception) {
+            Log.e("Photos", "Failed to copy photo", e)
+            Toast.makeText(this, "Foto konnte nicht gespeichert werden", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun loadPhotoPathsIntoMemory() {
+        val prefs = getSharedPreferences(PREFS_PHOTOS, MODE_PRIVATE)
+        val json = prefs.getString("paths_json", "[]") ?: "[]"
+        photoPaths.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val path = arr.getString(i)
+                if (File(path).exists()) photoPaths.add(path)
+            }
+        } catch (e: Exception) {
+            Log.w("Photos", "Failed to load photo paths", e)
+        }
+    }
+
+    private fun savePhotoPaths() {
+        val arr = JSONArray()
+        photoPaths.forEach { arr.put(it) }
+        getSharedPreferences(PREFS_PHOTOS, MODE_PRIVATE)
+            .edit().putString("paths_json", arr.toString()).apply()
+    }
+
+    private fun renderPhotos() {
+        val container = binding.llPhotosContainer
+        container.removeAllViews()
+        val sizePx = (96 * resources.displayMetrics.density).toInt()
+        if (photoPaths.isEmpty()) {
+            val tv = TextView(this).apply {
+                text = "Noch keine Fotos"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(4, 8, 4, 8)
+            }
+            container.addView(tv)
+            return
+        }
+        photoPaths.toList().forEach { path ->
+            val frame = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(0, 0, 8, 0) }
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+            }
+            val imageView = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(sizePx, sizePx)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                try {
+                    val opts = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                        BitmapFactory.decodeFile(path, this)
+                        inSampleSize = maxOf(1, maxOf(outWidth, outHeight) / sizePx)
+                        inJustDecodeBounds = false
+                    }
+                    val bmp = BitmapFactory.decodeFile(path, opts)
+                    if (bmp != null) setImageBitmap(bmp)
+                    else setImageResource(android.R.drawable.ic_menu_gallery)
+                } catch (e: Exception) {
+                    setImageResource(android.R.drawable.ic_menu_gallery)
+                }
+            }
+            val btnDel = Button(this).apply {
+                text = "✕"
+                textSize = 10f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                setPadding(8, 0, 8, 0)
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Foto löschen?")
+                        .setPositiveButton("Löschen") { _, _ ->
+                            photoPaths.remove(path)
+                            File(path).delete()
+                            savePhotoPaths()
+                            renderPhotos()
+                        }
+                        .setNegativeButton("Abbrechen", null)
+                        .show()
+                }
+            }
+            frame.addView(imageView)
+            frame.addView(btnDel)
+            container.addView(frame)
+        }
     }
 
     private fun exportUrkunde() {
@@ -1331,6 +1612,25 @@ class MainActivity : AppCompatActivity() {
         val totalDays = TimeUnit.MILLISECONDS.toDays(refTime - lmpCal.timeInMillis)
         val sswStr = if (totalDays >= 0) "SSW ${totalDays / 7}+${totalDays % 7}" else "–"
 
+        // Duration from Blasensprung to birth
+        val blasensprungBisGeburtStr = if (geburtszeit > 0L) {
+            val ms = geburtszeit - blasensprungTime
+            if (ms >= 0) {
+                val h = TimeUnit.MILLISECONDS.toHours(ms)
+                val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
+                "${h}h ${m}min"
+            } else "–"
+        } else "–"
+
+        // Milestone timers
+        fun milestoneStr(ts: Long): String {
+            if (ts <= 0L) return "–"
+            val ms = (if (geburtszeit > 0L) geburtszeit else System.currentTimeMillis()) - ts
+            val h = TimeUnit.MILLISECONDS.toHours(ms)
+            val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
+            return "${sdf.format(Date(ts))} Uhr (${h}h ${m}min)"
+        }
+
         val text = buildString {
             appendLine("🍼 ══════════════════════════════")
             appendLine("       GEBURTSURKUNDE 2026")
@@ -1354,11 +1654,41 @@ class MainActivity : AppCompatActivity() {
             appendLine("──────────────────────────────────")
             appendLine("🤰  Schwangerschaftswoche: $sswStr")
             appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
+            if (geburtszeit > 0L) {
+                appendLine("⏱️  Blasensprung → Geburt: $blasensprungBisGeburtStr")
+            }
+            appendLine()
+            appendLine("🏁  Geburts-Meilensteine:")
+            appendLine("      🔔 Einleitung:          ${milestoneStr(einleitungStartTime)}")
+            appendLine("      🌊 Wehen unregelmäßig:  ${milestoneStr(wehenUnregelStartTime)}")
+            appendLine("      ⚡ Wehen regelmäßig:    ${milestoneStr(wehenRegelStartTime)}")
+            if (customTimers.isNotEmpty()) {
+                appendLine()
+                appendLine("⏱️  Weitere Zeiten:")
+                customTimers.forEach { timer ->
+                    val timeStr = if (timer.startTime > 0L) sdf.format(Date(timer.startTime)) + " Uhr" else "–"
+                    val commentStr = if (timer.comment.isNotEmpty()) " – ${timer.comment}" else ""
+                    appendLine("      • ${timer.label}: $timeStr$commentStr")
+                }
+            }
             appendLine("──────────────────────────────────")
+            if (medicalItems.isNotEmpty()) {
+                appendLine()
+                appendLine("🏥  Medizinische Hinweise:")
+                medicalItems.forEach { (_, text) ->
+                    appendLine("      • $text")
+                }
+                appendLine()
+            }
             if (!notizen.isNullOrEmpty()) {
                 appendLine()
                 appendLine("📝  Notizen:")
                 appendLine(notizen)
+                appendLine()
+            }
+            if (photoPaths.isNotEmpty()) {
+                appendLine()
+                appendLine("📷  Fotos: ${photoPaths.size} Foto(s) gespeichert")
                 appendLine()
             }
             append("Erstellt mit Geburt2026 🍼")
@@ -1376,7 +1706,7 @@ class MainActivity : AppCompatActivity() {
         val sections = listOf(
             SearchSection(
                 "🏥 Medizinische Hinweise",
-                { binding.tvHepBInfo.text.toString() },
+                { medicalItems.joinToString(" ") { it.second } },
                 binding.cardMedical
             ),
             SearchSection(
@@ -2253,5 +2583,7 @@ class MainActivity : AppCompatActivity() {
 
         private const val PREFS_BLASENSPRUNG = "blasensprung"
         private const val PREFS_NOTIZEN_LIST = "notizen_list"
+        private const val PREFS_MEDICAL_LIST = "medical_list"
+        private const val PREFS_PHOTOS = "photos"
     }
 }

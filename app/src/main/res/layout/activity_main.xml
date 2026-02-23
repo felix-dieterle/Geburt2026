@@ -622,13 +622,20 @@
                     android:textColor="@color/warning_red"
                     android:paddingBottom="8dp" />
 
-                <TextView
-                    android:id="@+id/tvHepBInfo"
+                <LinearLayout
+                    android:id="@+id/llMedicalList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_primary"
-                    android:lineSpacingMultiplier="1.4" />
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/btnAddMedical"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="➕ Hinweis hinzufügen"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/warning_red" />
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -1452,6 +1459,64 @@
                     android:textSize="14sp"
                     android:background="@android:color/transparent"
                     android:layout_marginBottom="12dp" />
+
+                <!-- Photos section -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📷 Fotos"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:paddingBottom="6dp" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp">
+
+                    <LinearLayout
+                        android:id="@+id/llPhotosContainer"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="12dp">
+
+                    <Button
+                        android:id="@+id/btnTakePhoto"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="📷 Kamera"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnPickPhoto"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="🖼️ Galerie"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
 
                 <!-- Export button -->
                 <Button
