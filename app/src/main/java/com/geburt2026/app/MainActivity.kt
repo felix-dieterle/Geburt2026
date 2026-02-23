@@ -111,11 +111,12 @@ class MainActivity : AppCompatActivity() {
         renderAudioNotizen()
     }
 
-    // Blasensprung: 22.02.2026 um 6:15 Uhr
-    private val blasensprungTime: Long = Calendar.getInstance().apply {
+    // Blasensprung: 22.02.2026 um 6:15 Uhr (editable, persisted)
+    private val blasensprungDefault: Long = Calendar.getInstance().apply {
         set(2026, Calendar.FEBRUARY, 22, 6, 15, 0)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
+    private var blasensprungTime: Long = blasensprungDefault
 
     // Errechneter Geburtstermin: 08.03.2026
     private val dueDateCalendar: Calendar = Calendar.getInstance().apply {
@@ -131,6 +132,9 @@ class MainActivity : AppCompatActivity() {
     // Custom (user-defined) timers
     private data class CustomTimer(val id: Long, var label: String, var startTime: Long, var comment: String = "")
     private val customTimers = mutableListOf<CustomTimer>()
+
+    // Editable notes list (in-memory backing)
+    private val notizenItems = mutableListOf<Pair<Long, String>>()
 
     // Birth date & time (recorded when baby is born)
     private var geburtszeit: Long = 0L
@@ -263,6 +267,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupBirthInfo() {
+        val blasensprungPrefs = getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE)
+        blasensprungTime = blasensprungPrefs.getLong("timestamp", blasensprungDefault)
+
         val sdfDateTime = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
         val sdfDate = SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN)
         binding.tvBlasensprungTime.text = sdfDateTime.format(Date(blasensprungTime))
@@ -279,6 +286,15 @@ class MainActivity : AppCompatActivity() {
             blasensprungTime - lmpCal.timeInMillis
         ) % 7
         binding.tvSsw.text = "SSW ${weeksDiff}+${daysDiff} (Frühgeburt)"
+
+        binding.tvBlasensprungTime.setOnClickListener {
+            val initial = Calendar.getInstance().apply { timeInMillis = blasensprungTime }
+            showDateTimePicker(initial) { cal ->
+                blasensprungTime = cal.timeInMillis
+                blasensprungPrefs.edit().putLong("timestamp", blasensprungTime).apply()
+                binding.tvBlasensprungTime.text = sdfDateTime.format(Date(blasensprungTime))
+            }
+        }
     }
 
     private fun setupGeburtszeit() {
@@ -398,32 +414,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMilestoneStartDialog(label: String, onConfirmed: (Long) -> Unit) {
-        val now = Calendar.getInstance()
-        val options = arrayOf("Jetzt starten", "Uhrzeit wählen", "Zurücksetzen")
+        val options = arrayOf("Jetzt starten", "Datum & Uhrzeit wählen", "Zurücksetzen")
         AlertDialog.Builder(this)
             .setTitle("$label – Startzeit")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> onConfirmed(System.currentTimeMillis())
-                    1 -> {
-                        TimePickerDialog(
-                            this,
-                            { _, hour, minute ->
-                                val cal = Calendar.getInstance()
-                                cal.set(Calendar.HOUR_OF_DAY, hour)
-                                cal.set(Calendar.MINUTE, minute)
-                                cal.set(Calendar.SECOND, 0)
-                                cal.set(Calendar.MILLISECOND, 0)
-                                if (cal.timeInMillis > System.currentTimeMillis()) {
-                                    cal.add(Calendar.DAY_OF_YEAR, -1)
-                                }
-                                onConfirmed(cal.timeInMillis)
-                            },
-                            now.get(Calendar.HOUR_OF_DAY),
-                            now.get(Calendar.MINUTE),
-                            true
-                        ).show()
-                    }
+                    1 -> showDateTimePicker(Calendar.getInstance()) { cal -> onConfirmed(cal.timeInMillis) }
                     2 -> onConfirmed(0L)
                 }
             }
@@ -726,8 +723,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCustomTimerStartDialog(timer: CustomTimer) {
-        val now = Calendar.getInstance()
-        val options = arrayOf("Jetzt starten", "Uhrzeit wählen", "Zurücksetzen")
+        val options = arrayOf("Jetzt starten", "Datum & Uhrzeit wählen", "Zurücksetzen")
         AlertDialog.Builder(this)
             .setTitle("${timer.label} – Startzeit")
             .setItems(options) { _, which ->
@@ -738,26 +734,11 @@ class MainActivity : AppCompatActivity() {
                         renderCustomTimers()
                     }
                     1 -> {
-                        TimePickerDialog(
-                            this,
-                            { _, hour, minute ->
-                                val cal = Calendar.getInstance()
-                                cal.set(Calendar.HOUR_OF_DAY, hour)
-                                cal.set(Calendar.MINUTE, minute)
-                                cal.set(Calendar.SECOND, 0)
-                                cal.set(Calendar.MILLISECOND, 0)
-                                if (cal.timeInMillis > System.currentTimeMillis()) {
-                                    // If selected time is in the future, assume the user meant yesterday
-                                    cal.add(Calendar.DAY_OF_YEAR, -1)
-                                }
-                                timer.startTime = cal.timeInMillis
-                                saveCustomTimers()
-                                renderCustomTimers()
-                            },
-                            now.get(Calendar.HOUR_OF_DAY),
-                            now.get(Calendar.MINUTE),
-                            true
-                        ).show()
+                        showDateTimePicker(Calendar.getInstance()) { cal ->
+                            timer.startTime = cal.timeInMillis
+                            saveCustomTimers()
+                            renderCustomTimers()
+                        }
                     }
                     2 -> {
                         timer.startTime = 0L
@@ -841,22 +822,41 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupNotizen() {
-        val defaultNotes = buildString {
-            appendLine("• Falls Einleitung in Konstanz: Rizinus empfohlen")
-            appendLine("  (kann auch 12h gewartet werden)")
-            appendLine("• Geburt/Einleitung nach Blasensprung:")
-            appendLine("  Paar Tage möglich, wenn Blutwerte gut")
-            append("• Nach 12h darf man nach Hause")
-        }
-        val prefs = getSharedPreferences("notizen", MODE_PRIVATE)
-        binding.tvNotizen.setText(prefs.getString("text", defaultNotes))
-        binding.tvNotizen.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                prefs.edit().putString("text", s?.toString() ?: "").apply()
+        // Migrate old single-text notes to list on first run
+        val oldPrefs = getSharedPreferences("notizen", MODE_PRIVATE)
+        val listPrefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        if (!listPrefs.contains("items_json") && oldPrefs.contains("text")) {
+            val oldText = oldPrefs.getString("text", "") ?: ""
+            if (oldText.isNotEmpty()) {
+                val arr = JSONArray()
+                oldText.lines().filter { it.isNotBlank() }.forEachIndexed { i, line ->
+                    val obj = JSONObject()
+                    obj.put("id", System.currentTimeMillis() + i)
+                    obj.put("text", line.trimStart('•', ' '))
+                    arr.put(obj)
+                }
+                listPrefs.edit().putString("items_json", arr.toString()).apply()
             }
-        })
+        }
+        if (!listPrefs.contains("items_json")) {
+            val defaultItems = listOf(
+                "Falls Einleitung in Konstanz: Rizinus empfohlen (kann auch 12h gewartet werden)",
+                "Geburt/Einleitung nach Blasensprung: Paar Tage möglich, wenn Blutwerte gut",
+                "Nach 12h darf man nach Hause"
+            )
+            val arr = JSONArray()
+            defaultItems.forEachIndexed { i, text ->
+                val obj = JSONObject()
+                obj.put("id", System.currentTimeMillis() + i)
+                obj.put("text", text)
+                arr.put(obj)
+            }
+            listPrefs.edit().putString("items_json", arr.toString()).apply()
+        }
+
+        loadNotizenItemsIntoMemory()
+        renderNotizenItems()
+        binding.btnAddNotiz.setOnClickListener { addNotizenItem() }
 
         val einleitungPrefs = getSharedPreferences("einleitung_notizen", MODE_PRIVATE)
         binding.etEinleitungNotizen.setText(einleitungPrefs.getString("text", ""))
@@ -887,6 +887,110 @@ class MainActivity : AppCompatActivity() {
                 wehenRegelPrefs.edit().putString("text", s?.toString() ?: "").apply()
             }
         })
+    }
+
+    private fun loadNotizenItemsIntoMemory() {
+        val prefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        val json = prefs.getString("items_json", "[]") ?: "[]"
+        notizenItems.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                notizenItems.add(Pair(obj.getLong("id"), obj.getString("text")))
+            }
+        } catch (e: Exception) {
+            Log.w("Notizen", "Failed to load notizen items", e)
+        }
+    }
+
+    private fun saveNotizenItems(items: List<Pair<Long, String>>) {
+        val arr = JSONArray()
+        items.forEach { (id, text) ->
+            val obj = JSONObject()
+            obj.put("id", id)
+            obj.put("text", text)
+            arr.put(obj)
+        }
+        getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+            .edit().putString("items_json", arr.toString()).apply()
+    }
+
+    private fun renderNotizenItems() {
+        val container = binding.llNotizenList
+        container.removeAllViews()
+        notizenItems.forEach { (id, text) ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(0, 0, 0, 6) }
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+
+            val etText = EditText(this).apply {
+                setText(text)
+                textSize = 14f
+                setTextColor(getColor(R.color.text_primary))
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                minLines = 1
+                gravity = android.view.Gravity.TOP
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        val idx = notizenItems.indexOfFirst { it.first == id }
+                        if (idx >= 0) {
+                            notizenItems[idx] = Pair(id, s?.toString() ?: "")
+                            saveNotizenItems(notizenItems)
+                        }
+                    }
+                })
+            }
+
+            val btnDelete = Button(this).apply {
+                text = "✕"
+                textSize = 11f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(6, 0, 0, 0) }
+                setOnClickListener {
+                    notizenItems.removeAll { it.first == id }
+                    saveNotizenItems(notizenItems)
+                    renderNotizenItems()
+                }
+            }
+
+            row.addView(etText)
+            row.addView(btnDelete)
+            container.addView(row)
+        }
+    }
+
+    private fun addNotizenItem() {
+        val editText = EditText(this).apply {
+            hint = "Neue Notiz…"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setPadding(48, 24, 48, 8)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Notiz hinzufügen")
+            .setView(editText)
+            .setPositiveButton("Hinzufügen") { _, _ ->
+                val noteText = editText.text.toString().trim()
+                if (noteText.isNotEmpty()) {
+                    notizenItems.add(Pair(System.currentTimeMillis(), noteText))
+                    saveNotizenItems(notizenItems)
+                    renderNotizenItems()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun setupKinderInfo() {
@@ -1287,7 +1391,7 @@ class MainActivity : AppCompatActivity() {
             ),
             SearchSection(
                 "📝 Notizen zur Einleitung",
-                { binding.tvNotizen.text.toString() },
+                { notizenItems.joinToString(" ") { it.second } },
                 binding.cardNotes
             ),
             SearchSection(
@@ -2146,5 +2250,8 @@ class MainActivity : AppCompatActivity() {
         private const val WEHEN_REG_WARN_ORANGE_TEXT = ">4h: KH-Fahrt prüfen"
         private const val WEHEN_REG_WARN_RED_H = 8
         private const val WEHEN_REG_WARN_RED_TEXT = ">8h: Sofort ins Krankenhaus!"
+
+        private const val PREFS_BLASENSPRUNG = "blasensprung"
+        private const val PREFS_NOTIZEN_LIST = "notizen_list"
     }
 }

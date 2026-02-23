@@ -730,18 +730,20 @@
                     android:textColor="@color/primary_dark"
                     android:paddingBottom="8dp" />
 
-                <EditText
-                    android:id="@+id/tvNotizen"
+                <LinearLayout
+                    android:id="@+id/llNotizenList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_primary"
-                    android:lineSpacingMultiplier="1.4"
-                    android:inputType="textMultiLine|textCapSentences"
-                    android:minLines="3"
-                    android:gravity="top"
-                    android:background="@android:color/transparent"
-                    android:hint="Notizen eingeben…" />
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/btnAddNotiz"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="➕ Notiz hinzufügen"
+                    android:textSize="12sp"
+                    android:backgroundTint="@color/primary_dark" />
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>
