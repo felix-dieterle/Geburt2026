@@ -952,7 +952,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val btnDelete = Button(this).apply {
-                text = "✕"
+                this.text = "✕"
                 textSize = 11f
                 backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
                 layoutParams = LinearLayout.LayoutParams(
