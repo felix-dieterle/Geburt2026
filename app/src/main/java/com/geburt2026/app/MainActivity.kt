@@ -154,7 +154,7 @@ class MainActivity : AppCompatActivity() {
     private val geburtPhasen: List<GeburtPhase> by lazy {
         listOf(
             GeburtPhase("🌅", "Latenzphase", "Unregelmäßige Wehen – Vorbereitung & Abwarten") { b ->
-                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardAudioNotizen)
+                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
             },
             GeburtPhase("🌊", "Eröffnungsphase", "Regelmäßige Wehen – Gebärmutterhals öffnet sich") { b ->
                 listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
@@ -163,10 +163,10 @@ class MainActivity : AppCompatActivity() {
                 listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
             },
             GeburtPhase("💪", "Austreibungsphase", "Pressen – Baby kommt!") { b ->
-                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
+                listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
             },
             GeburtPhase("🍼", "Nachgeburtsphase", "Hep-B-Impfung, erste Stunden, Nachgeburt") { b ->
-                listOf(b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen)
+                listOf(b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
             },
         )
     }
@@ -207,6 +207,7 @@ class MainActivity : AppCompatActivity() {
         tasks.addAll(loadTasks())
         setupChecklist()
         setupContacts()
+        setupEckdaten()
         setupSearch()
         setupAudioNotizen()
         setupPhasen()
@@ -1155,6 +1156,118 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupEckdaten() {
+        val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+
+        // Restore saved values
+        binding.etBabyName.setText(prefs.getString("name", ""))
+        binding.etBabyGewicht.setText(prefs.getString("gewicht_g", ""))
+        binding.etBabyGroesse.setText(prefs.getString("groesse_cm", ""))
+        binding.etBabyKopfumfang.setText(prefs.getString("kopfumfang_cm", ""))
+        binding.etApgar1.setText(prefs.getString("apgar_1", ""))
+        binding.etApgar5.setText(prefs.getString("apgar_5", ""))
+        binding.etApgar10.setText(prefs.getString("apgar_10", ""))
+        binding.etGeburtsart.setText(prefs.getString("geburtsart", ""))
+        binding.etGeburtsort.setText(prefs.getString("geburtsort", ""))
+        binding.etBlutgruppe.setText(prefs.getString("blutgruppe", ""))
+        binding.etEckdatenNotizen.setText(prefs.getString("notizen", ""))
+
+        // Auto-save helper
+        fun saveField(key: String, view: EditText) {
+            view.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    prefs.edit().putString(key, s?.toString() ?: "").apply()
+                }
+            })
+        }
+
+        saveField("name", binding.etBabyName)
+        saveField("gewicht_g", binding.etBabyGewicht)
+        saveField("groesse_cm", binding.etBabyGroesse)
+        saveField("kopfumfang_cm", binding.etBabyKopfumfang)
+        saveField("apgar_1", binding.etApgar1)
+        saveField("apgar_5", binding.etApgar5)
+        saveField("apgar_10", binding.etApgar10)
+        saveField("geburtsart", binding.etGeburtsart)
+        saveField("geburtsort", binding.etGeburtsort)
+        saveField("blutgruppe", binding.etBlutgruppe)
+        saveField("notizen", binding.etEckdatenNotizen)
+
+        binding.btnExportUrkunde.setOnClickListener { exportUrkunde() }
+    }
+
+    private fun exportUrkunde() {
+        val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+
+        fun field(key: String, suffix: String = "") =
+            prefs.getString(key, "")?.trim()?.takeIf { it.isNotEmpty() }
+                ?.let { if (suffix.isEmpty()) it else "$it $suffix" } ?: "–"
+
+        val name = field("name")
+        val gewicht = field("gewicht_g", "g")
+        val groesse = field("groesse_cm", "cm")
+        val kopfumfang = field("kopfumfang_cm", "cm")
+        val apgar1 = field("apgar_1")
+        val apgar5 = field("apgar_5")
+        val apgar10 = field("apgar_10")
+        val geburtsart = field("geburtsart")
+        val geburtsort = field("geburtsort")
+        val blutgruppe = field("blutgruppe")
+        val notizen = prefs.getString("notizen", "")?.trim()
+
+        val geburtszeitStr = if (geburtszeit > 0L) sdf.format(Date(geburtszeit)) + " Uhr" else "–"
+
+        // SSW at birth
+        val lmpCal = dueDateCalendar.clone() as Calendar
+        lmpCal.add(Calendar.DAY_OF_YEAR, -280)
+        val refTime = if (geburtszeit > 0L) geburtszeit else blasensprungTime
+        val totalDays = TimeUnit.MILLISECONDS.toDays(refTime - lmpCal.timeInMillis)
+        val sswStr = if (totalDays >= 0) "SSW ${totalDays / 7}+${totalDays % 7}" else "–"
+
+        val text = buildString {
+            appendLine("🍼 ══════════════════════════════")
+            appendLine("       GEBURTSURKUNDE 2026")
+            appendLine("   ══════════════════════════════")
+            appendLine()
+            appendLine("👶  Name:            $name")
+            appendLine("📅  Geburtszeitpunkt: $geburtszeitStr")
+            appendLine("🏥  Geburtsort:       $geburtsort")
+            appendLine("🍼  Geburtsart:       $geburtsart")
+            appendLine()
+            appendLine("⚖️  Gewicht:          $gewicht")
+            appendLine("📏  Körperlänge:      $groesse")
+            appendLine("🔵  Kopfumfang:       $kopfumfang")
+            appendLine("🩸  Blutgruppe:       $blutgruppe")
+            appendLine()
+            appendLine("💗  APGAR-Werte:")
+            appendLine("      1 Minute:    $apgar1 / 10")
+            appendLine("      5 Minuten:   $apgar5 / 10")
+            appendLine("     10 Minuten:   $apgar10 / 10")
+            appendLine()
+            appendLine("──────────────────────────────────")
+            appendLine("🤰  Schwangerschaftswoche: $sswStr")
+            appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
+            appendLine("──────────────────────────────────")
+            if (!notizen.isNullOrEmpty()) {
+                appendLine()
+                appendLine("📝  Notizen:")
+                appendLine(notizen)
+                appendLine()
+            }
+            append("Erstellt mit Geburt2026 🍼")
+        }
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            putExtra(Intent.EXTRA_SUBJECT, "Geburtsurkunde – $name")
+        }
+        startActivity(Intent.createChooser(intent, "Zusammenfassung teilen"))
+    }
+
     private fun setupSearch() {
         val sections = listOf(
             SearchSection(
@@ -1206,6 +1319,15 @@ class MainActivity : AppCompatActivity() {
                         " KH Konstanz KH Singen KH Überlingen Kreissaal Notruf"
                 },
                 binding.cardContacts
+            ),
+            SearchSection(
+                "👶 Eckdaten – Geburt & Kind",
+                {
+                    val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+                    listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "geburtsart", "geburtsort", "blutgruppe", "notizen")
+                        .joinToString(" ") { prefs.getString(it, "") ?: "" }
+                },
+                binding.cardEckdaten
             ),
         )
 
@@ -1588,7 +1710,7 @@ class MainActivity : AppCompatActivity() {
             binding.cardTimer, binding.cardMedical, binding.cardWishes,
             binding.cardLabor, binding.cardNotes, binding.cardKids,
             binding.cardBetreuung, binding.cardHospital, binding.cardChecklist,
-            binding.cardContacts, binding.cardAudioNotizen
+            binding.cardContacts, binding.cardAudioNotizen, binding.cardEckdaten
         )
         val visibleCards = phase.visibleCards(binding)
         allCards.forEach { card ->
