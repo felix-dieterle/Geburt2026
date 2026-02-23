@@ -252,6 +252,51 @@
                     android:paddingTop="6dp"
                     android:gravity="center" />
 
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginVertical="10dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="👶 Geburt"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <TextView
+                            android:id="@+id/tvGeburtszeit"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="–"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary_dark" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/btnSetGeburtszeit"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Eintragen"
+                        android:textSize="12sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
+
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -426,6 +471,20 @@
                         android:paddingTop="2dp"
                         android:visibility="gone" />
 
+                    <EditText
+                        android:id="@+id/etWehenUnregelNotizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_primary"
+                        android:lineSpacingMultiplier="1.4"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:minLines="2"
+                        android:gravity="top"
+                        android:background="@android:color/transparent"
+                        android:hint="Notizen zu unregelmäßigen Wehen…" />
+
                 </LinearLayout>
 
                 <View
@@ -494,6 +553,20 @@
                         android:textStyle="bold"
                         android:paddingTop="2dp"
                         android:visibility="gone" />
+
+                    <EditText
+                        android:id="@+id/etWehenRegelNotizen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_primary"
+                        android:lineSpacingMultiplier="1.4"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:minLines="2"
+                        android:gravity="top"
+                        android:background="@android:color/transparent"
+                        android:hint="Notizen zu regelmäßigen Wehen…" />
 
                 </LinearLayout>
 
