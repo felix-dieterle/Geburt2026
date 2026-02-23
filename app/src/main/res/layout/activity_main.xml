@@ -1106,6 +1106,363 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Eckdaten Geburt & Kind Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardEckdaten"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_eckdaten">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👶 Eckdaten – Geburt &amp; Kind"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="12dp" />
+
+                <!-- Baby Name -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👶 Name des Babys"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary" />
+
+                <EditText
+                    android:id="@+id/etBabyName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Name eingeben…"
+                    android:inputType="textPersonName|textCapWords"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:background="@android:color/transparent"
+                    android:paddingBottom="8dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Weight & Length row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⚖️ Gewicht (g)"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etBabyGewicht"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="z.B. 3250"
+                            android:inputType="number"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="📏 Länge (cm)"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etBabyGroesse"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="z.B. 51"
+                            android:inputType="numberDecimal"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Head circumference & birth type row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🔵 Kopfumfang (cm)"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etBabyKopfumfang"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="z.B. 34"
+                            android:inputType="numberDecimal"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🍼 Geburtsart"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etGeburtsart"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="z.B. Spontangeburt"
+                            android:inputType="textCapSentences"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- APGAR section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💗 APGAR-Werte"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:paddingBottom="6dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="4dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="1 min"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etApgar1"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="0–10"
+                            android:inputType="number"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="5 min"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etApgar5"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="0–10"
+                            android:inputType="number"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="4dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="10 min"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etApgar10"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="0–10"
+                            android:inputType="number"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Birth location & blood type row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginEnd="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🏥 Geburtsort"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etGeburtsort"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="Krankenhaus"
+                            android:inputType="textCapWords"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="8dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="🩸 Blutgruppe"
+                            android:textSize="12sp"
+                            android:textColor="@color/text_secondary" />
+
+                        <EditText
+                            android:id="@+id/etBlutgruppe"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="z.B. A+"
+                            android:inputType="textCapCharacters"
+                            android:textSize="14sp"
+                            android:background="@android:color/transparent" />
+                    </LinearLayout>
+
+                </LinearLayout>
+
+                <!-- Additional notes -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📝 Weitere Notizen"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="12dp"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etEckdatenNotizen"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Besonderheiten, erste Eindrücke…"
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:minLines="2"
+                    android:gravity="top"
+                    android:textSize="14sp"
+                    android:background="@android:color/transparent"
+                    android:layout_marginBottom="12dp" />
+
+                <!-- Export button -->
+                <Button
+                    android:id="@+id/btnExportUrkunde"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📋 Zusammenfassung / Urkundenexport"
+                    android:textSize="13sp"
+                    android:backgroundTint="@color/success_green" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Footer -->
         <TextView
             android:layout_width="match_parent"
