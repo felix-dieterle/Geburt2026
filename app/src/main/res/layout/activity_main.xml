@@ -355,6 +355,16 @@
                             android:textSize="12sp"
                             android:backgroundTint="@color/primary_dark" />
 
+                        <Button
+                            android:id="@+id/btnStopEinleitung"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="⏹"
+                            android:textSize="12sp"
+                            android:backgroundTint="@color/text_secondary"
+                            android:visibility="gone" />
+
                     </LinearLayout>
 
                     <TextView
@@ -439,6 +449,16 @@
                             android:textSize="12sp"
                             android:backgroundTint="@color/primary_dark" />
 
+                        <Button
+                            android:id="@+id/btnStopWehenUnregel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="⏹"
+                            android:textSize="12sp"
+                            android:backgroundTint="@color/text_secondary"
+                            android:visibility="gone" />
+
                     </LinearLayout>
 
                     <TextView
@@ -521,6 +541,16 @@
                             android:text="Jetzt"
                             android:textSize="12sp"
                             android:backgroundTint="@color/primary_dark" />
+
+                        <Button
+                            android:id="@+id/btnStopWehenRegel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:text="⏹"
+                            android:textSize="12sp"
+                            android:backgroundTint="@color/text_secondary"
+                            android:visibility="gone" />
 
                     </LinearLayout>
 
