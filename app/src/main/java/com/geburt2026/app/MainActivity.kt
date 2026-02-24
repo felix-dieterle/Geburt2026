@@ -43,6 +43,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
@@ -111,9 +112,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private val pickPhotoLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { copyPhotoToInternalStorage(it) }
+        ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        uris.forEach { copyPhotoToInternalStorage(it) }
     }
 
     // ── Audio recording fields ─────────────────────────────────────────────────
@@ -1792,7 +1793,7 @@ class MainActivity : AppCompatActivity() {
     private fun copyPhotoToInternalStorage(uri: Uri) {
         try {
             val photoDir = File(filesDir, "photos").also { it.mkdirs() }
-            val destFile = File(photoDir, "photo_${System.currentTimeMillis()}.jpg")
+            val destFile = File(photoDir, "photo_${UUID.randomUUID()}.jpg")
             contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(destFile).use { output -> input.copyTo(output) }
             }
