@@ -173,9 +173,20 @@ class MainActivity : AppCompatActivity() {
     private var einleitungStartTime: Long = 0L
     private var wehenUnregelStartTime: Long = 0L
     private var wehenRegelStartTime: Long = 0L
+    // Milestone timer stop timestamps (0 = not stopped)
+    private var einleitungStopTime: Long = 0L
+    private var wehenUnregelStopTime: Long = 0L
+    private var wehenRegelStopTime: Long = 0L
 
     // Custom (user-defined) timers
-    private data class CustomTimer(val id: Long, var label: String, var startTime: Long, var comment: String = "")
+    private data class CustomTimer(
+        val id: Long,
+        var label: String,
+        var startTime: Long,
+        var stopTime: Long = 0L,
+        var hasCounter: Boolean = true,
+        var comment: String = ""
+    )
     private val customTimers = mutableListOf<CustomTimer>()
 
     // Editable notes list (in-memory backing)
@@ -433,12 +444,16 @@ class MainActivity : AppCompatActivity() {
         einleitungStartTime = prefs.getLong("einleitung", 0L)
         wehenUnregelStartTime = prefs.getLong("wehen_unregelmaessig", 0L)
         wehenRegelStartTime = prefs.getLong("wehen_regelmaessig", 0L)
+        einleitungStopTime = prefs.getLong("einleitung_stop", 0L)
+        wehenUnregelStopTime = prefs.getLong("wehen_unregelmaessig_stop", 0L)
+        wehenRegelStopTime = prefs.getLong("wehen_regelmaessig_stop", 0L)
 
         updateMilestoneTimerRow(
             einleitungStartTime,
             binding.tvEinleitungTime,
             binding.tvEinleitungElapsed,
             binding.tvEinleitungWarning,
+            stopTime = einleitungStopTime,
             warnOrangeHours = einleitungWarnOrangeH, warnOrangeText = ">${einleitungWarnOrangeH}h: Arzt über Einleitungsdauer informieren",
             warnRedHours = einleitungWarnRedH, warnRedText = ">${einleitungWarnRedH}h: Dringend Arzt kontaktieren!"
         )
@@ -447,6 +462,7 @@ class MainActivity : AppCompatActivity() {
             binding.tvWehenUnregelTime,
             binding.tvWehenUnregelElapsed,
             binding.tvWehenUnregelWarning,
+            stopTime = wehenUnregelStopTime,
             warnOrangeHours = wehenUnregWarnOrangeH, warnOrangeText = ">${wehenUnregWarnOrangeH}h: Hebamme informieren",
             warnRedHours = wehenUnregWarnRedH, warnRedText = ">${wehenUnregWarnRedH}h: Arzt / KH kontaktieren!"
         )
@@ -455,51 +471,83 @@ class MainActivity : AppCompatActivity() {
             binding.tvWehenRegelTime,
             binding.tvWehenRegelElapsed,
             binding.tvWehenRegelWarning,
+            stopTime = wehenRegelStopTime,
             warnOrangeHours = wehenRegWarnOrangeH, warnOrangeText = ">${wehenRegWarnOrangeH}h: KH-Fahrt prüfen",
             warnRedHours = wehenRegWarnRedH, warnRedText = ">${wehenRegWarnRedH}h: Sofort ins Krankenhaus!"
         )
+        updateMilestoneStopButtonVisibility()
 
         binding.btnStartEinleitung.setOnClickListener {
             showMilestoneStartDialog("Einleitung") { ts ->
                 einleitungStartTime = ts
-                prefs.edit().putLong("einleitung", ts).apply()
+                einleitungStopTime = 0L
+                prefs.edit().putLong("einleitung", ts).putLong("einleitung_stop", 0L).apply()
                 updateMilestoneTimerRow(
                     ts, binding.tvEinleitungTime, binding.tvEinleitungElapsed,
                     binding.tvEinleitungWarning,
                     warnOrangeHours = einleitungWarnOrangeH, warnOrangeText = ">${einleitungWarnOrangeH}h: Arzt über Einleitungsdauer informieren",
                     warnRedHours = einleitungWarnRedH, warnRedText = ">${einleitungWarnRedH}h: Dringend Arzt kontaktieren!"
                 )
+                updateMilestoneStopButtonVisibility()
             }
+        }
+        binding.btnStopEinleitung.setOnClickListener {
+            einleitungStopTime = System.currentTimeMillis()
+            prefs.edit().putLong("einleitung_stop", einleitungStopTime).apply()
+            updateMilestoneStopButtonVisibility()
         }
         binding.btnStartWehenUnregel.setOnClickListener {
             showMilestoneStartDialog("Wehen unregelmäßig") { ts ->
                 wehenUnregelStartTime = ts
-                prefs.edit().putLong("wehen_unregelmaessig", ts).apply()
+                wehenUnregelStopTime = 0L
+                prefs.edit().putLong("wehen_unregelmaessig", ts).putLong("wehen_unregelmaessig_stop", 0L).apply()
                 updateMilestoneTimerRow(
                     ts, binding.tvWehenUnregelTime, binding.tvWehenUnregelElapsed,
                     binding.tvWehenUnregelWarning,
                     warnOrangeHours = wehenUnregWarnOrangeH, warnOrangeText = ">${wehenUnregWarnOrangeH}h: Hebamme informieren",
                     warnRedHours = wehenUnregWarnRedH, warnRedText = ">${wehenUnregWarnRedH}h: Arzt / KH kontaktieren!"
                 )
+                updateMilestoneStopButtonVisibility()
             }
+        }
+        binding.btnStopWehenUnregel.setOnClickListener {
+            wehenUnregelStopTime = System.currentTimeMillis()
+            prefs.edit().putLong("wehen_unregelmaessig_stop", wehenUnregelStopTime).apply()
+            updateMilestoneStopButtonVisibility()
         }
         binding.btnStartWehenRegel.setOnClickListener {
             showMilestoneStartDialog("Wehen regelmäßig") { ts ->
                 wehenRegelStartTime = ts
-                prefs.edit().putLong("wehen_regelmaessig", ts).apply()
+                wehenRegelStopTime = 0L
+                prefs.edit().putLong("wehen_regelmaessig", ts).putLong("wehen_regelmaessig_stop", 0L).apply()
                 updateMilestoneTimerRow(
                     ts, binding.tvWehenRegelTime, binding.tvWehenRegelElapsed,
                     binding.tvWehenRegelWarning,
                     warnOrangeHours = wehenRegWarnOrangeH, warnOrangeText = ">${wehenRegWarnOrangeH}h: KH-Fahrt prüfen",
                     warnRedHours = wehenRegWarnRedH, warnRedText = ">${wehenRegWarnRedH}h: Sofort ins Krankenhaus!"
                 )
+                updateMilestoneStopButtonVisibility()
             }
+        }
+        binding.btnStopWehenRegel.setOnClickListener {
+            wehenRegelStopTime = System.currentTimeMillis()
+            prefs.edit().putLong("wehen_regelmaessig_stop", wehenRegelStopTime).apply()
+            updateMilestoneStopButtonVisibility()
         }
 
         // Custom timers
         loadCustomTimers()
         renderCustomTimers()
         binding.btnAddCustomTimer.setOnClickListener { showAddCustomTimerDialog() }
+    }
+
+    private fun updateMilestoneStopButtonVisibility() {
+        binding.btnStopEinleitung.visibility =
+            if (einleitungStartTime > 0L && einleitungStopTime == 0L) View.VISIBLE else View.GONE
+        binding.btnStopWehenUnregel.visibility =
+            if (wehenUnregelStartTime > 0L && wehenUnregelStopTime == 0L) View.VISIBLE else View.GONE
+        binding.btnStopWehenRegel.visibility =
+            if (wehenRegelStartTime > 0L && wehenRegelStopTime == 0L) View.VISIBLE else View.GONE
     }
 
     private fun showMilestoneStartDialog(label: String, onConfirmed: (Long) -> Unit) {
@@ -521,6 +569,7 @@ class MainActivity : AppCompatActivity() {
         tvTime: TextView,
         tvElapsed: TextView,
         tvWarning: TextView? = null,
+        stopTime: Long = 0L,
         warnOrangeHours: Int = -1,
         warnOrangeText: String = "",
         warnRedHours: Int = -1,
@@ -535,7 +584,7 @@ class MainActivity : AppCompatActivity() {
         val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
         tvTime.text = sdf.format(Date(startTime))
         tvElapsed.visibility = View.VISIBLE
-        val elapsed = System.currentTimeMillis() - startTime
+        val elapsed = if (stopTime > 0L) stopTime - startTime else System.currentTimeMillis() - startTime
         if (elapsed < 0) {
             tvElapsed.visibility = View.GONE
             tvWarning?.visibility = View.GONE
@@ -569,6 +618,7 @@ class MainActivity : AppCompatActivity() {
             binding.tvEinleitungTime,
             binding.tvEinleitungElapsed,
             binding.tvEinleitungWarning,
+            stopTime = einleitungStopTime,
             warnOrangeHours = einleitungWarnOrangeH, warnOrangeText = ">${einleitungWarnOrangeH}h: Arzt über Einleitungsdauer informieren",
             warnRedHours = einleitungWarnRedH, warnRedText = ">${einleitungWarnRedH}h: Dringend Arzt kontaktieren!"
         )
@@ -577,6 +627,7 @@ class MainActivity : AppCompatActivity() {
             binding.tvWehenUnregelTime,
             binding.tvWehenUnregelElapsed,
             binding.tvWehenUnregelWarning,
+            stopTime = wehenUnregelStopTime,
             warnOrangeHours = wehenUnregWarnOrangeH, warnOrangeText = ">${wehenUnregWarnOrangeH}h: Hebamme informieren",
             warnRedHours = wehenUnregWarnRedH, warnRedText = ">${wehenUnregWarnRedH}h: Arzt / KH kontaktieren!"
         )
@@ -585,15 +636,17 @@ class MainActivity : AppCompatActivity() {
             binding.tvWehenRegelTime,
             binding.tvWehenRegelElapsed,
             binding.tvWehenRegelWarning,
+            stopTime = wehenRegelStopTime,
             warnOrangeHours = wehenRegWarnOrangeH, warnOrangeText = ">${wehenRegWarnOrangeH}h: KH-Fahrt prüfen",
             warnRedHours = wehenRegWarnRedH, warnRedText = ">${wehenRegWarnRedH}h: Sofort ins Krankenhaus!"
         )
-        // Update all custom timer elapsed views
+        // Update all custom timer elapsed views (only for timers with counter)
         for (timer in customTimers) {
+            if (!timer.hasCounter) continue
             val container = binding.llCustomTimers.findViewWithTag<LinearLayout>("ct_${timer.id}") ?: continue
             val tvTime = container.findViewWithTag<TextView>("ct_time_${timer.id}") ?: continue
             val tvElapsed = container.findViewWithTag<TextView>("ct_elapsed_${timer.id}") ?: continue
-            updateMilestoneTimerRow(timer.startTime, tvTime, tvElapsed)
+            updateMilestoneTimerRow(timer.startTime, tvTime, tvElapsed, stopTime = timer.stopTime)
         }
     }
 
@@ -611,6 +664,8 @@ class MainActivity : AppCompatActivity() {
                         id = obj.getLong("id"),
                         label = obj.getString("label"),
                         startTime = obj.getLong("startTime"),
+                        stopTime = obj.optLong("stopTime", 0L),
+                        hasCounter = obj.optBoolean("hasCounter", true),
                         comment = obj.optString("comment", "")
                     )
                 )
@@ -627,6 +682,8 @@ class MainActivity : AppCompatActivity() {
             obj.put("id", t.id)
             obj.put("label", t.label)
             obj.put("startTime", t.startTime)
+            obj.put("stopTime", t.stopTime)
+            obj.put("hasCounter", t.hasCounter)
             obj.put("comment", t.comment)
             arr.put(obj)
         }
@@ -659,24 +716,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showCustomTimerFreeTextDialog() {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 8)
+        }
         val editText = EditText(this).apply {
             hint = "Timer-Bezeichnung"
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            setPadding(48, 24, 48, 8)
         }
+        val cbCounter = CheckBox(this).apply {
+            text = "Mit Zähler (Laufuhr)"
+            isChecked = true
+            setPadding(0, 8, 0, 0)
+        }
+        layout.addView(editText)
+        layout.addView(cbCounter)
         AlertDialog.Builder(this)
             .setTitle("Eigene Bezeichnung")
-            .setView(editText)
+            .setView(layout)
             .setPositiveButton("Hinzufügen") { _, _ ->
                 val label = editText.text.toString().trim()
-                if (label.isNotEmpty()) addCustomTimer(label)
+                if (label.isNotEmpty()) addCustomTimer(label, cbCounter.isChecked)
             }
             .setNegativeButton("Abbrechen", null)
             .show()
     }
 
-    private fun addCustomTimer(label: String) {
-        val timer = CustomTimer(id = System.currentTimeMillis(), label = label, startTime = 0L)
+    private fun addCustomTimer(label: String, hasCounter: Boolean = true) {
+        val timer = CustomTimer(id = System.currentTimeMillis(), label = label, startTime = 0L, hasCounter = hasCounter)
         customTimers.add(timer)
         saveCustomTimers()
         renderCustomTimers()
@@ -706,7 +773,7 @@ class MainActivity : AppCompatActivity() {
                 tag = "ct_${timer.id}"
             }
 
-            // Header row: label + start button + delete button
+            // Header row: label + start button + stop button (counter only) + delete button
             val headerRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(
@@ -735,6 +802,23 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener { showCustomTimerStartDialog(timer) }
             }
 
+            val btnStop = Button(this).apply {
+                text = "⏹"
+                textSize = 12f
+                backgroundTintList = ColorStateList.valueOf(getColor(R.color.text_secondary))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).also { it.setMargins(4, 0, 0, 0) }
+                // Visible only when counter is active and running (started but not yet stopped)
+                visibility = if (timer.hasCounter && timer.startTime > 0L && timer.stopTime == 0L) View.VISIBLE else View.GONE
+                setOnClickListener {
+                    timer.stopTime = System.currentTimeMillis()
+                    saveCustomTimers()
+                    renderCustomTimers()
+                }
+            }
+
             val btnDelete = Button(this).apply {
                 text = "✕"
                 textSize = 12f
@@ -759,6 +843,7 @@ class MainActivity : AppCompatActivity() {
 
             headerRow.addView(tvLabel)
             headerRow.addView(btnStart)
+            if (timer.hasCounter) headerRow.addView(btnStop)
             headerRow.addView(btnDelete)
             timerRow.addView(headerRow)
 
@@ -772,16 +857,19 @@ class MainActivity : AppCompatActivity() {
             }
             timerRow.addView(tvTime)
 
-            // Elapsed time display
-            val tvElapsed = TextView(this).apply {
-                text = ""
-                textSize = 22f
-                setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
-                setTextColor(getColor(R.color.primary_dark))
-                visibility = if (timer.startTime > 0L) View.VISIBLE else View.GONE
-                tag = "ct_elapsed_${timer.id}"
+            // Elapsed time display (only for timers with counter)
+            if (timer.hasCounter) {
+                val tvElapsed = TextView(this).apply {
+                    text = ""
+                    textSize = 22f
+                    setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD)
+                    setTextColor(getColor(R.color.primary_dark))
+                    visibility = if (timer.startTime > 0L) View.VISIBLE else View.GONE
+                    tag = "ct_elapsed_${timer.id}"
+                }
+                timerRow.addView(tvElapsed)
+                updateMilestoneTimerRow(timer.startTime, tvTime, tvElapsed, stopTime = timer.stopTime)
             }
-            timerRow.addView(tvElapsed)
 
             // Comment/note EditText
             val etComment = EditText(this).apply {
@@ -805,9 +893,6 @@ class MainActivity : AppCompatActivity() {
             timerRow.addView(etComment)
 
             container.addView(timerRow)
-
-            // Update elapsed time immediately
-            updateMilestoneTimerRow(timer.startTime, tvTime, tvElapsed)
         }
     }
 
@@ -819,18 +904,21 @@ class MainActivity : AppCompatActivity() {
                 when (which) {
                     0 -> {
                         timer.startTime = System.currentTimeMillis()
+                        timer.stopTime = 0L
                         saveCustomTimers()
                         renderCustomTimers()
                     }
                     1 -> {
                         showDateTimePicker(Calendar.getInstance()) { cal ->
                             timer.startTime = cal.timeInMillis
+                            timer.stopTime = 0L
                             saveCustomTimers()
                             renderCustomTimers()
                         }
                     }
                     2 -> {
                         timer.startTime = 0L
+                        timer.stopTime = 0L
                         saveCustomTimers()
                         renderCustomTimers()
                     }
