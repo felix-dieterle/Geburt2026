@@ -1748,6 +1748,37 @@ class MainActivity : AppCompatActivity() {
         binding.btnPickPhoto.setOnClickListener {
             pickPhotoLauncher.launch("image/*")
         }
+        binding.btnExportPhotos.setOnClickListener { exportPhotos() }
+    }
+
+    private fun exportPhotos() {
+        if (photoPaths.isEmpty()) {
+            Toast.makeText(this, "Keine Fotos vorhanden", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val uris = ArrayList<Uri>()
+            photoPaths.forEach { path ->
+                val file = File(path)
+                if (file.exists()) {
+                    uris.add(FileProvider.getUriForFile(this, "$packageName.fileprovider", file))
+                }
+            }
+            if (uris.isEmpty()) {
+                Toast.makeText(this, "Keine Fotos gefunden", Toast.LENGTH_SHORT).show()
+                return
+            }
+            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "image/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(Intent.EXTRA_SUBJECT, "Geburt2026 – Fotos")
+            }
+            startActivity(Intent.createChooser(intent, "Fotos exportieren"))
+        } catch (e: Exception) {
+            Log.e("Photos", "Export failed", e)
+            Toast.makeText(this, "Foto-Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun launchCamera() {
@@ -2928,6 +2959,80 @@ class MainActivity : AppCompatActivity() {
 
         val etHospitalPhone = addTextField("📞 Krankenhaus-Rufnummer (für Anruf-Button)", hospitalCallPhone)
         val etOpnvUrl = addTextField("🚌 ÖPNV-URL (für Transport-Button)", opnvUrl)
+
+        // ── Übersicht aktueller Listen ────────────────────────────────────────
+        dialogLayout.addView(View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 2
+            ).also { it.setMargins(0, 24, 0, 8) }
+            setBackgroundColor(getColor(R.color.divider))
+        })
+        dialogLayout.addView(TextView(this).apply {
+            text = "📋 Aktuelle Listen-Konfiguration"
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(getColor(R.color.primary_dark))
+            setPadding(0, 8, 0, 8)
+        })
+
+        // Medical hints
+        addLabel("🏥 Medizinische Hinweise (${medicalItems.size} Einträge):")
+        medicalItems.forEach { (_, text) ->
+            dialogLayout.addView(TextView(this).apply {
+                this.text = "• $text"
+                textSize = 13f
+                setPadding(16, 2, 0, 2)
+                setTextColor(getColor(R.color.text_primary))
+            })
+        }
+        if (medicalItems.isEmpty()) {
+            dialogLayout.addView(TextView(this).apply {
+                text = "  (keine Einträge)"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+            })
+        }
+
+        // Checklist
+        val doneTasks = tasks.count { it.done }
+        addLabel("✅ Checkliste (${doneTasks}/${tasks.size} erledigt):")
+        tasks.forEach { task ->
+            dialogLayout.addView(TextView(this).apply {
+                this.text = "${if (task.done) "☑" else "☐"} ${task.text}"
+                textSize = 13f
+                setPadding(16, 2, 0, 2)
+                setTextColor(getColor(R.color.text_primary))
+            })
+        }
+        if (tasks.isEmpty()) {
+            dialogLayout.addView(TextView(this).apply {
+                text = "  (keine Aufgaben)"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+            })
+        }
+
+        // Contacts
+        val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val editableContacts = EDITABLE_CONTACT_KEYS.map { key ->
+            Pair(key, contactPrefs.getString(key, "") ?: "")
+        }
+        val filledContacts = editableContacts.count { it.second.isNotEmpty() }
+        addLabel("📞 Kontakte (${filledContacts}/${EDITABLE_CONTACT_KEYS.size} eingetragen):")
+        editableContacts.forEach { (name, number) ->
+            dialogLayout.addView(TextView(this).apply {
+                this.text = if (number.isNotEmpty()) "📞 $name: $number"
+                             else "✏️ $name: (nicht eingetragen)"
+                textSize = 13f
+                setPadding(16, 2, 0, 2)
+                setTextColor(
+                    getColor(if (number.isNotEmpty()) R.color.link_blue else R.color.text_secondary)
+                )
+            })
+        }
+
+        // Photos
+        addLabel("📷 Fotos (${photoPaths.size} gespeichert)")
 
         val scrollView = android.widget.ScrollView(this).apply {
             addView(dialogLayout)

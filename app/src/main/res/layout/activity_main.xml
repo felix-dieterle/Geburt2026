@@ -1594,6 +1594,15 @@
                     android:textSize="13sp"
                     android:backgroundTint="@color/success_green" />
 
+                <Button
+                    android:id="@+id/btnExportPhotos"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="📷 Fotos exportieren / teilen"
+                    android:textSize="13sp"
+                    android:backgroundTint="@color/primary_dark" />
+
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
