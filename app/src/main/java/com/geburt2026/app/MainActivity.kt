@@ -3126,6 +3126,7 @@ class MainActivity : AppCompatActivity() {
             val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
             val contactObj = JSONObject()
             EDITABLE_CONTACT_KEYS.forEach { key -> contactObj.put(key, contactPrefs.getString(key, "") ?: "") }
+            PRECONFIGURED_CONTACTS.forEach { (name, number) -> contactObj.put(name, number) }
             root.put("contacts", contactObj)
 
             // Betreuung
@@ -3353,6 +3354,16 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private val EDITABLE_CONTACT_KEYS = listOf(
             "Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
+        )
+
+        private val PRECONFIGURED_CONTACTS = mapOf(
+            "KH Singen (Zentrale)" to "07731 89-0",
+            "KH Singen (Kreissaal)" to "07731 89-1710",
+            "KH Überlingen (Zentrale)" to "07551 89-0",
+            "KH Überlingen (Kreissaal)" to "07551 89-1310",
+            "KH Konstanz (Zentrale)" to "07531 801-0",
+            "KH Konstanz (Kreissaal)" to "07531 801-2830",
+            "Notruf" to "112"
         )
 
         // Default values for milestone warning thresholds (hours)
