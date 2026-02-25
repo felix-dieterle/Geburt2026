@@ -16,7 +16,7 @@ import java.util.Locale
 class SetupWizardActivity : AppCompatActivity() {
 
     private var currentStep = 0
-    private val totalSteps = 5
+    private val totalSteps = 6
 
     // Collected wizard values
     private val dueDateCal: Calendar = Calendar.getInstance().apply {
@@ -29,6 +29,7 @@ class SetupWizardActivity : AppCompatActivity() {
     private lateinit var stepDueDate: View
     private lateinit var stepHospital: View
     private lateinit var stepContacts: View
+    private lateinit var stepKinder: View
     private lateinit var stepDone: View
 
     private lateinit var tvStepIndicator: TextView
@@ -42,6 +43,7 @@ class SetupWizardActivity : AppCompatActivity() {
     private lateinit var etHebammePhone: EditText
     private lateinit var etOmaPhone: EditText
     private lateinit var etKinderarztPhone: EditText
+    private lateinit var etKinderInfo: EditText
     private lateinit var tvWizardSummary: TextView
 
     // Dialable phone numbers per hospital radio button id
@@ -56,6 +58,7 @@ class SetupWizardActivity : AppCompatActivity() {
         "Geburtstermin",
         "Krankenhaus",
         "Kontakte",
+        "Kinder",
         "Fertig"
     )
 
@@ -76,6 +79,7 @@ class SetupWizardActivity : AppCompatActivity() {
         stepDueDate = findViewById(R.id.stepDueDate)
         stepHospital = findViewById(R.id.stepHospital)
         stepContacts = findViewById(R.id.stepContacts)
+        stepKinder = findViewById(R.id.stepKinder)
         stepDone = findViewById(R.id.stepDone)
         tvStepIndicator = findViewById(R.id.tvStepIndicator)
         tvStepTitle = findViewById(R.id.tvStepTitle)
@@ -87,6 +91,7 @@ class SetupWizardActivity : AppCompatActivity() {
         etHebammePhone = findViewById(R.id.etHebammePhone)
         etOmaPhone = findViewById(R.id.etOmaPhone)
         etKinderarztPhone = findViewById(R.id.etKinderarztPhone)
+        etKinderInfo = findViewById(R.id.etKinderInfo)
         tvWizardSummary = findViewById(R.id.tvWizardSummary)
 
         // Load existing due date from prefs
@@ -115,8 +120,12 @@ class SetupWizardActivity : AppCompatActivity() {
         // Load existing contacts
         val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
         etHebammePhone.setText(contactPrefs.getString("Hebamme", "") ?: "")
-        etOmaPhone.setText(contactPrefs.getString("Oma (Sipplinen)", "") ?: "")
+        etOmaPhone.setText(contactPrefs.getString("Oma/Opa", "") ?: "")
         etKinderarztPhone.setText(contactPrefs.getString("Kinderarzt", "") ?: "")
+
+        // Load existing kinder info
+        val kinderPrefs = getSharedPreferences("kinder_info", MODE_PRIVATE)
+        etKinderInfo.setText(kinderPrefs.getString("text", "") ?: "")
 
         // Due date click → show DatePickerDialog
         tvWizardDueDate.setOnClickListener {
@@ -168,6 +177,7 @@ class SetupWizardActivity : AppCompatActivity() {
         stepDueDate.visibility = View.GONE
         stepHospital.visibility = View.GONE
         stepContacts.visibility = View.GONE
+        stepKinder.visibility = View.GONE
         stepDone.visibility = View.GONE
 
         // Show current step
@@ -176,7 +186,8 @@ class SetupWizardActivity : AppCompatActivity() {
             1 -> stepDueDate.visibility = View.VISIBLE
             2 -> stepHospital.visibility = View.VISIBLE
             3 -> stepContacts.visibility = View.VISIBLE
-            4 -> {
+            4 -> stepKinder.visibility = View.VISIBLE
+            5 -> {
                 stepDone.visibility = View.VISIBLE
                 buildSummary()
             }
@@ -223,9 +234,18 @@ class SetupWizardActivity : AppCompatActivity() {
                 val oma = etOmaPhone.text.toString().trim()
                 val kinderarzt = etKinderarztPhone.text.toString().trim()
                 if (hebamme.isNotEmpty()) editor.putString("Hebamme", hebamme)
-                if (oma.isNotEmpty()) editor.putString("Oma (Sipplinen)", oma)
+                if (oma.isNotEmpty()) editor.putString("Oma/Opa", oma)
                 if (kinderarzt.isNotEmpty()) editor.putString("Kinderarzt", kinderarzt)
                 editor.apply()
+            }
+            4 -> {
+                // Persist kinder info
+                val kinderText = etKinderInfo.text.toString().trim()
+                if (kinderText.isNotEmpty()) {
+                    getSharedPreferences("kinder_info", MODE_PRIVATE).edit()
+                        .putString("text", kinderText)
+                        .apply()
+                }
             }
         }
     }
@@ -234,6 +254,7 @@ class SetupWizardActivity : AppCompatActivity() {
         val sdf = SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN)
         val settingsPrefs = getSharedPreferences("einstellungen", MODE_PRIVATE)
         val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val kinderPrefs = getSharedPreferences("kinder_info", MODE_PRIVATE)
 
         val dueDateStr = sdf.format(dueDateCal.time)
         val hospitalPhone = settingsPrefs.getString("hospital_call_phone", "") ?: ""
@@ -244,15 +265,17 @@ class SetupWizardActivity : AppCompatActivity() {
             else -> if (hospitalPhone.isNotEmpty()) "Anderes ($hospitalPhone)" else "(nicht eingetragen)"
         }
         val hebamme = contactPrefs.getString("Hebamme", "") ?: ""
-        val oma = contactPrefs.getString("Oma (Sipplinen)", "") ?: ""
+        val oma = contactPrefs.getString("Oma/Opa", "") ?: ""
         val kinderarzt = contactPrefs.getString("Kinderarzt", "") ?: ""
+        val kinderInfo = kinderPrefs.getString("text", "") ?: ""
 
         tvWizardSummary.text = buildString {
             append("📅 Geburtstermin: $dueDateStr\n")
             append("🏥 Krankenhaus: $hospitalName\n")
             append("🏥 Hebamme: ${if (hebamme.isNotEmpty()) hebamme else "(nicht eingetragen)"}\n")
-            append("👵 Oma/Sipplinen: ${if (oma.isNotEmpty()) oma else "(nicht eingetragen)"}\n")
-            append("👶 Kinderarzt: ${if (kinderarzt.isNotEmpty()) kinderarzt else "(nicht eingetragen)"}")
+            append("👵 Oma/Opa: ${if (oma.isNotEmpty()) oma else "(nicht eingetragen)"}\n")
+            append("👶 Kinderarzt: ${if (kinderarzt.isNotEmpty()) kinderarzt else "(nicht eingetragen)"}\n")
+            append("👨‍👩‍👧‍👦 Kinder: ${if (kinderInfo.isNotEmpty()) "(eingetragen)" else "(nicht eingetragen)"}")
         }
     }
 

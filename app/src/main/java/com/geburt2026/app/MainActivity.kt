@@ -1584,7 +1584,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupContacts() {
         val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
         val contacts = listOf(
-            Contact("Oma (Sipplinen)", prefs.getString("Oma (Sipplinen)", "") ?: "", editable = true),
+            Contact("Oma/Opa", prefs.getString("Oma/Opa", "") ?: "", editable = true),
             Contact("Hebamme", prefs.getString("Hebamme", "") ?: "", editable = true),
             Contact("KH Singen (Zentrale)", "07731 89-0"),
             Contact("KH Singen (Kreissaal)", "07731 89-1710"),
@@ -3596,7 +3596,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private val EDITABLE_CONTACT_KEYS = listOf(
-            "Oma (Sipplinen)", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
+            "Oma/Opa", "Hebamme", "Kinderarzt", "Arbeit (Teams)", "Gemeinde (Essen)"
         )
 
         private val PRECONFIGURED_CONTACTS = mapOf(

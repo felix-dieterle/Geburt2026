@@ -290,7 +290,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="👵 Oma / Sipplinen (Telefonnummer)"
+                    android:text="👵 Oma/Opa (Telefonnummer)"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textColor="@color/primary_dark"
@@ -301,7 +301,7 @@
                     android:id="@+id/etOmaPhone"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Nummer der Oma"
+                    android:hint="Nummer von Oma/Opa"
                     android:inputType="phone"
                     android:textSize="15sp"
                     android:padding="10dp" />
@@ -326,7 +326,46 @@
                     android:padding="10dp" />
             </LinearLayout>
 
-            <!-- Step 5: Done -->
+            <!-- Step 5: Kinder -->
+            <LinearLayout
+                android:id="@+id/stepKinder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="👨‍👩‍👧‍👦 Kinder &amp; Transport"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Trage hier Informationen zu den Kindern und dem Transport ein. Dieses Feld kann auch später in der App angepasst werden."
+                    android:textSize="15sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="16dp"
+                    android:lineSpacingMultiplier="1.3" />
+
+                <EditText
+                    android:id="@+id/etKinderInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="z.B.:&#10;Kind 1: Name, 7 Jahre&#10;Kind 2: Name, 4 Jahre&#10;Transport: ..."
+                    android:inputType="textMultiLine|textCapSentences"
+                    android:minLines="6"
+                    android:gravity="top"
+                    android:textSize="14sp"
+                    android:padding="10dp" />
+            </LinearLayout>
+
+            <!-- Step 6: Done -->
             <LinearLayout
                 android:id="@+id/stepDone"
                 android:layout_width="match_parent"
