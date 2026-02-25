@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_light">
+
+    <!-- Progress indicator -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/primary">
+
+        <TextView
+            android:id="@+id/tvStepIndicator"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Schritt 1 von 4"
+            android:textColor="@color/white"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvStepTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Willkommen"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Scrollable content area -->
+    <android.widget.ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Step 1: Welcome -->
+            <LinearLayout
+                android:id="@+id/stepWelcome"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="visible">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🍼"
+                    android:textSize="64sp"
+                    android:gravity="center"
+                    android:paddingTop="24dp"
+                    android:paddingBottom="16dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Willkommen bei Geburt 2026"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:gravity="center"
+                    android:paddingBottom="16dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Dieser kurze Einrichtungsassistent hilft dir, die wichtigsten Parameter für deine Geburt einzutragen:\n\n• Errechneter Geburtstermin\n• Bevorzugtes Krankenhaus\n• Wichtige Kontakte\n\nDu kannst alle Einstellungen später jederzeit über das ⚙️-Menü anpassen."
+                    android:textSize="16sp"
+                    android:textColor="@color/text_primary"
+                    android:lineSpacingMultiplier="1.4"
+                    android:paddingBottom="24dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Nur wenige Schritte – dauert unter 2 Minuten! 🚀"
+                    android:textSize="15sp"
+                    android:textStyle="italic"
+                    android:textColor="@color/text_secondary"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Step 2: Due Date -->
+            <LinearLayout
+                android:id="@+id/stepDueDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📅 Errechneter Geburtstermin"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Wann ist dein errechneter Geburtstermin? Dieser wird für die SSW-Berechnung und die Zeitanzeigen verwendet."
+                    android:textSize="15sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="24dp"
+                    android:lineSpacingMultiplier="1.3" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Geburtstermin (ET)"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvWizardDueDate"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Datum wählen..."
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/link_blue"
+                    android:padding="12dp"
+                    android:background="@android:drawable/editbox_background"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="(Tippe auf das Datum zum Ändern)"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingTop="4dp" />
+            </LinearLayout>
+
+            <!-- Step 3: Hospital Selection -->
+            <LinearLayout
+                android:id="@+id/stepHospital"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🏥 Krankenhaus"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Welches Krankenhaus kommt für die Geburt in Frage? Die Kreissaal-Nummer wird als Standard-Anrufnummer hinterlegt."
+                    android:textSize="15sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="16dp"
+                    android:lineSpacingMultiplier="1.3" />
+
+                <RadioGroup
+                    android:id="@+id/rgHospital"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="16dp">
+
+                    <RadioButton
+                        android:id="@+id/rbKhKonstanz"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="KH Konstanz (Kreissaal: 07531 801-2830)"
+                        android:textSize="15sp"
+                        android:padding="8dp" />
+
+                    <RadioButton
+                        android:id="@+id/rbKhSingen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="KH Singen (Kreissaal: 07731 89-1710)"
+                        android:textSize="15sp"
+                        android:padding="8dp" />
+
+                    <RadioButton
+                        android:id="@+id/rbKhUeberlingen"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="KH Überlingen (Kreissaal: 07551 89-1310)"
+                        android:textSize="15sp"
+                        android:padding="8dp" />
+
+                    <RadioButton
+                        android:id="@+id/rbKhOther"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Anderes Krankenhaus"
+                        android:textSize="15sp"
+                        android:padding="8dp" />
+                </RadioGroup>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Rufnummer Kreissaal"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etHospitalPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="z.B. 0753180100"
+                    android:inputType="phone"
+                    android:textSize="15sp"
+                    android:padding="10dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="(Wird für den Anruf-Button im Krankenhaus-Abschnitt verwendet. Bitte ohne Leerzeichen/Bindestriche eingeben.)"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingTop="4dp"
+                    android:lineSpacingMultiplier="1.2" />
+            </LinearLayout>
+
+            <!-- Step 4: Contacts -->
+            <LinearLayout
+                android:id="@+id/stepContacts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📞 Wichtige Kontakte"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Trage die Nummern deiner wichtigsten Kontakte ein. Alle Felder sind optional – du kannst sie auch später in der App eintragen oder anpassen."
+                    android:textSize="15sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="20dp"
+                    android:lineSpacingMultiplier="1.3" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🏥 Hebamme (Telefonnummer)"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etHebammePhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Nummer der Hebamme"
+                    android:inputType="phone"
+                    android:textSize="15sp"
+                    android:padding="10dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="👵 Oma / Sipplinen (Telefonnummer)"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etOmaPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Nummer der Oma"
+                    android:inputType="phone"
+                    android:textSize="15sp"
+                    android:padding="10dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="👶 Kinderarzt (Telefonnummer)"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="4dp" />
+
+                <EditText
+                    android:id="@+id/etKinderarztPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Nummer des Kinderarztes"
+                    android:inputType="phone"
+                    android:textSize="15sp"
+                    android:padding="10dp" />
+            </LinearLayout>
+
+            <!-- Step 5: Done -->
+            <LinearLayout
+                android:id="@+id/stepDone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🎉"
+                    android:textSize="64sp"
+                    android:gravity="center"
+                    android:paddingTop="24dp"
+                    android:paddingBottom="16dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Alles eingerichtet!"
+                    android:textSize="24sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:gravity="center"
+                    android:paddingBottom="16dp" />
+
+                <TextView
+                    android:id="@+id/tvWizardSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary"
+                    android:lineSpacingMultiplier="1.5"
+                    android:paddingBottom="24dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Alle Einstellungen können jederzeit über das ⚙️-Menü angepasst werden."
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.3" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </android.widget.ScrollView>
+
+    <!-- Navigation buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:background="@color/white"
+        android:elevation="8dp">
+
+        <Button
+            android:id="@+id/btnWizardBack"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="← Zurück"
+            android:textSize="15sp"
+            android:visibility="invisible"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/btnWizardNext"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Weiter →"
+            android:textSize="15sp"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+</LinearLayout>
