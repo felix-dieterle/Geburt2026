@@ -2878,6 +2878,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupEinstellungen() {
         binding.btnEinstellungen.setOnClickListener { showSettingsDialog() }
         binding.btnExportAll.setOnClickListener { exportAllConfig() }
+        binding.btnExportZip.setOnClickListener { exportAllAsZip() }
         binding.btnImportAll.setOnClickListener {
             importAllConfigLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
         }
@@ -3168,6 +3169,248 @@ class MainActivity : AppCompatActivity() {
             Log.e("ExportAll", "Export failed", e)
             Toast.makeText(this, "Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun exportAllAsZip() {
+        try {
+            val sdf = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.GERMAN)
+            val timestamp = sdf.format(Date())
+            val zipFile = File(cacheDir, "geburt2026_export_$timestamp.zip")
+
+            java.util.zip.ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
+
+                // 1. Urkunde as text file
+                val urkundeText = buildUrkundeText()
+                zos.putNextEntry(java.util.zip.ZipEntry("urkunde.txt"))
+                zos.write(urkundeText.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+
+                // 2. Complete settings/config as JSON
+                val configJson = buildAllConfigJson()
+                zos.putNextEntry(java.util.zip.ZipEntry("einstellungen.json"))
+                zos.write(configJson.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+
+                // 3. Photos
+                photoPaths.forEach { path ->
+                    val f = File(path)
+                    if (f.exists()) {
+                        zos.putNextEntry(java.util.zip.ZipEntry("photos/${f.name}"))
+                        f.inputStream().use { it.copyTo(zos) }
+                        zos.closeEntry()
+                    }
+                }
+
+                // 4. Audio recordings
+                val audioNotizen = loadAudioNotizen()
+                audioNotizen.forEach { notiz ->
+                    val f = File(notiz.audioFilePath)
+                    if (f.exists()) {
+                        zos.putNextEntry(java.util.zip.ZipEntry("audio/${f.name}"))
+                        f.inputStream().use { it.copyTo(zos) }
+                        zos.closeEntry()
+                    }
+                }
+
+                // 5. Text notes
+                val notizenText = buildNotizenText()
+                zos.putNextEntry(java.util.zip.ZipEntry("notizen.txt"))
+                zos.write(notizenText.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+            }
+
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", zipFile)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/zip"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, "Geburt2026 – Komplettexport")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "ZIP exportieren"))
+        } catch (e: Exception) {
+            Log.e("ExportZip", "ZIP export failed", e)
+            Toast.makeText(this, "ZIP-Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun buildUrkundeText(): String {
+        val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+
+        fun field(key: String, suffix: String = "") =
+            prefs.getString(key, "")?.trim()?.takeIf { it.isNotEmpty() }
+                ?.let { if (suffix.isEmpty()) it else "$it $suffix" } ?: "–"
+
+        val name = field("name")
+        val gewicht = field("gewicht_g", "g")
+        val groesse = field("groesse_cm", "cm")
+        val kopfumfang = field("kopfumfang_cm", "cm")
+        val apgar1 = field("apgar_1")
+        val apgar5 = field("apgar_5")
+        val apgar10 = field("apgar_10")
+        val geburtsart = field("geburtsart")
+        val geburtsort = field("geburtsort")
+        val blutgruppe = field("blutgruppe")
+        val notizen = prefs.getString("notizen", "")?.trim()
+
+        val geburtszeitStr = if (geburtszeit > 0L) sdf.format(Date(geburtszeit)) + " Uhr" else "–"
+
+        val lmpCal = dueDateCalendar.clone() as Calendar
+        lmpCal.add(Calendar.DAY_OF_YEAR, -280)
+        val refTime = if (geburtszeit > 0L) geburtszeit else blasensprungTime
+        val totalDays = TimeUnit.MILLISECONDS.toDays(refTime - lmpCal.timeInMillis)
+        val sswStr = if (totalDays >= 0) "SSW ${totalDays / 7}+${totalDays % 7}" else "–"
+
+        val blasensprungBisGeburtStr = if (geburtszeit > 0L) {
+            val ms = geburtszeit - blasensprungTime
+            if (ms >= 0) {
+                val h = TimeUnit.MILLISECONDS.toHours(ms)
+                val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
+                "${h}h ${m}min"
+            } else "–"
+        } else "–"
+
+        fun milestoneStr(ts: Long): String {
+            if (ts <= 0L) return "–"
+            val ms = (if (geburtszeit > 0L) geburtszeit else System.currentTimeMillis()) - ts
+            val h = TimeUnit.MILLISECONDS.toHours(ms)
+            val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
+            return "${sdf.format(Date(ts))} Uhr (${h}h ${m}min)"
+        }
+
+        return buildString {
+            appendLine("🍼 ══════════════════════════════")
+            appendLine("       GEBURTSURKUNDE 2026")
+            appendLine("   ══════════════════════════════")
+            appendLine()
+            appendLine("👶  Name:            $name")
+            appendLine("📅  Geburtszeitpunkt: $geburtszeitStr")
+            appendLine("🏥  Geburtsort:       $geburtsort")
+            appendLine("🍼  Geburtsart:       $geburtsart")
+            appendLine()
+            appendLine("⚖️  Gewicht:          $gewicht")
+            appendLine("📏  Körperlänge:      $groesse")
+            appendLine("🔵  Kopfumfang:       $kopfumfang")
+            appendLine("🩸  Blutgruppe:       $blutgruppe")
+            appendLine()
+            appendLine("💗  APGAR-Werte:")
+            appendLine("      1 Minute:    $apgar1 / 10")
+            appendLine("      5 Minuten:   $apgar5 / 10")
+            appendLine("     10 Minuten:   $apgar10 / 10")
+            appendLine()
+            appendLine("──────────────────────────────────")
+            appendLine("🤰  Schwangerschaftswoche: $sswStr")
+            appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
+            if (geburtszeit > 0L) {
+                appendLine("⏱️  Blasensprung → Geburt: $blasensprungBisGeburtStr")
+            }
+            appendLine()
+            appendLine("🏁  Geburts-Meilensteine:")
+            appendLine("      🔔 Einleitung:          ${milestoneStr(einleitungStartTime)}")
+            appendLine("      🌊 Wehen unregelmäßig:  ${milestoneStr(wehenUnregelStartTime)}")
+            appendLine("      ⚡ Wehen regelmäßig:    ${milestoneStr(wehenRegelStartTime)}")
+            if (customTimers.isNotEmpty()) {
+                appendLine()
+                appendLine("⏱️  Weitere Zeiten:")
+                customTimers.forEach { timer ->
+                    val timeStr = if (timer.startTime > 0L) sdf.format(Date(timer.startTime)) + " Uhr" else "–"
+                    val commentStr = if (timer.comment.isNotEmpty()) " – ${timer.comment}" else ""
+                    appendLine("      • ${timer.label}: $timeStr$commentStr")
+                }
+            }
+            appendLine("──────────────────────────────────")
+            if (medicalItems.isNotEmpty()) {
+                appendLine()
+                appendLine("🏥  Medizinische Hinweise:")
+                medicalItems.forEach { (_, t) -> appendLine("      • $t") }
+                appendLine()
+            }
+            if (!notizen.isNullOrEmpty()) {
+                appendLine()
+                appendLine("📝  Notizen:")
+                appendLine(notizen)
+                appendLine()
+            }
+            if (photoPaths.isNotEmpty()) {
+                appendLine()
+                appendLine("📷  Fotos: ${photoPaths.size} Foto(s) gespeichert")
+                appendLine()
+            }
+            append("Erstellt mit Geburt2026 🍼")
+        }
+    }
+
+    private fun buildNotizenText(): String {
+        return buildString {
+            if (notizenItems.isNotEmpty()) {
+                appendLine("=== Notizen ===")
+                notizenItems.forEach { (_, text) -> appendLine("• $text") }
+                appendLine()
+            }
+            val sdfTs = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+            val audioNotizen = loadAudioNotizen()
+            if (audioNotizen.isNotEmpty()) {
+                appendLine("=== Audio-Notizen (Transkriptionen) ===")
+                audioNotizen.forEach { n ->
+                    appendLine("• [${sdfTs.format(Date(n.timestamp))}] ${n.phaseName}")
+                    if (n.transcription.isNotEmpty()) appendLine("  ${n.transcription}")
+                }
+                appendLine()
+            }
+            val einleitungNotes = getSharedPreferences("einleitung_notizen", MODE_PRIVATE).getString("text", "") ?: ""
+            val wehenUnregNotes = getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: ""
+            val wehenRegNotes = getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: ""
+            if (einleitungNotes.isNotEmpty()) { appendLine("=== Notizen zur Einleitung ==="); appendLine(einleitungNotes); appendLine() }
+            if (wehenUnregNotes.isNotEmpty()) { appendLine("=== Notizen Wehen unregelmäßig ==="); appendLine(wehenUnregNotes); appendLine() }
+            if (wehenRegNotes.isNotEmpty()) { appendLine("=== Notizen Wehen regelmäßig ==="); appendLine(wehenRegNotes); appendLine() }
+        }
+    }
+
+    private fun buildAllConfigJson(): String {
+        val root = JSONObject()
+        val settingsPrefs = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+        val settingsObj = JSONObject()
+        settingsPrefs.all.forEach { (k, v) -> settingsObj.put(k, v) }
+        root.put("einstellungen", settingsObj)
+        val bsPrefs = getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE)
+        root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", blasensprungDefault))
+        val gzPrefs = getSharedPreferences("geburtszeit", MODE_PRIVATE)
+        root.put("geburtszeit_timestamp", gzPrefs.getLong("timestamp", 0L))
+        val msPrefs = getSharedPreferences("milestones", MODE_PRIVATE)
+        root.put("einleitung_start", msPrefs.getLong("einleitung", 0L))
+        root.put("wehen_unreg_start", msPrefs.getLong("wehen_unregelmaessig", 0L))
+        root.put("wehen_reg_start", msPrefs.getLong("wehen_regelmaessig", 0L))
+        val phasenPrefs = getSharedPreferences("phasen", MODE_PRIVATE)
+        root.put("current_phase", phasenPrefs.getInt("currentPhase", 0))
+        val ctPrefs = getSharedPreferences("custom_timers", MODE_PRIVATE)
+        root.put("custom_timers", JSONArray(ctPrefs.getString("timers_json", "[]") ?: "[]"))
+        val medPrefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        root.put("medical_items", JSONArray(medPrefs.getString("items_json", "[]") ?: "[]"))
+        val notPrefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        root.put("notizen_items", JSONArray(notPrefs.getString("items_json", "[]") ?: "[]"))
+        root.put("einleitung_notizen", getSharedPreferences("einleitung_notizen", MODE_PRIVATE).getString("text", "") ?: "")
+        root.put("wehen_unreg_notizen", getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: "")
+        root.put("wehen_reg_notizen", getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: "")
+        val checkPrefs = getSharedPreferences("checklist", MODE_PRIVATE)
+        root.put("checklist", JSONArray(checkPrefs.getString("tasks", "[]") ?: "[]"))
+        val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val contactObj = JSONObject()
+        EDITABLE_CONTACT_KEYS.forEach { key -> contactObj.put(key, contactPrefs.getString(key, "") ?: "") }
+        PRECONFIGURED_CONTACTS.forEach { (name, number) -> contactObj.put(name, number) }
+        root.put("contacts", contactObj)
+        val betrPrefs = getSharedPreferences("betreuung", MODE_PRIVATE)
+        root.put("betreuung", JSONArray(betrPrefs.getString("eintraege", "[]") ?: "[]"))
+        val eckPrefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+        val eckObj = JSONObject()
+        listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "apgar_1", "apgar_5", "apgar_10", "geburtsart", "geburtsort", "blutgruppe", "notizen")
+            .forEach { key -> eckObj.put(key, eckPrefs.getString(key, "") ?: "") }
+        root.put("eckdaten", eckObj)
+        root.put("geburtswuensche", JSONArray(getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE).getString("items_json", "[]") ?: "[]"))
+        root.put("kinder_info", getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE).getString("text", "") ?: "")
+        root.put("hospital_info", getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE).getString("text", "") ?: "")
+        val audioPrefs = getSharedPreferences("audio_notizen", MODE_PRIVATE)
+        root.put("audio_notizen", JSONArray(audioPrefs.getString("notizen", "[]") ?: "[]"))
+        return root.toString(2)
     }
 
     private fun importAllConfig(uri: Uri) {
