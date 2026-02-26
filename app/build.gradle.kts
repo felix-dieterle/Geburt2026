@@ -49,6 +49,16 @@ android {
     }
 }
 
+androidComponents {
+    val appVersionName = android.defaultConfig.versionName ?: "1.0.0"
+    val appVersionCode = android.defaultConfig.versionCode ?: 1
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("Geburt2026-$appVersionName-$appVersionCode.apk")
+        }
+    }
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

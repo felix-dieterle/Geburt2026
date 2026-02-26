@@ -57,6 +57,6 @@ jobs:
             - 👨‍👩‍👧‍👦 Kinder & Transport-Koordination
             - ✅ Checkliste für die nächsten 4 Tage
             - 📞 Notfallkontakte
-          files: app/build/outputs/apk/release/app-release.apk
+          files: app/build/outputs/apk/release/Geburt2026-*.apk
           draft: false
           prerelease: false
