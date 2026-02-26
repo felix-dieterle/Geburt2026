@@ -2487,7 +2487,7 @@ class MainActivity : AppCompatActivity() {
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
     data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
     data class AudioNotiz(val id: Long, val phaseIndex: Int, val phaseName: String, val timestamp: Long, val audioFilePath: String, val transcription: String)
-    data class TrackerEntry(val id: Long, val category: String, val timestamp: Long)
+    data class TrackerEntry(val id: Long, val category: String, val timestamp: Long, val value: Double? = null)
 
     // ── Contact picker helpers ────────────────────────────────────────────────
 
@@ -3606,6 +3606,34 @@ class MainActivity : AppCompatActivity() {
         binding.btnTrackerKaka.setOnClickListener { addTrackerEntry("kaka") }
         binding.btnTrackerPipi.setOnClickListener { addTrackerEntry("pipi") }
         binding.btnTrackerStillen.setOnClickListener { addTrackerEntry("stillen") }
+        binding.btnTrackerGewicht.setOnClickListener { showWeightInputDialog() }
+    }
+
+    private fun showWeightInputDialog() {
+        val editText = EditText(this).apply {
+            hint = "z.B. 3250"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setPadding(48, 24, 48, 8)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("⚖️ Gewicht erfassen")
+            .setMessage("Gewicht in Gramm eingeben:")
+            .setView(editText)
+            .setPositiveButton("Speichern") { _, _ ->
+                val input = editText.text.toString().trim()
+                val weightG = input.toDoubleOrNull()
+                if (weightG != null && weightG > 0) {
+                    val now = System.currentTimeMillis()
+                    trackerEntries.add(TrackerEntry(now, "gewicht", now, weightG))
+                    saveTrackerEntries()
+                    renderTracker()
+                    Toast.makeText(this, "⚖️ Gewicht ${weightG.toInt()} g eingetragen!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Bitte gültige Gramm-Zahl eingeben.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun loadTrackerEntries() {
@@ -3616,7 +3644,7 @@ class MainActivity : AppCompatActivity() {
             val arr = JSONArray(json)
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
-                trackerEntries.add(TrackerEntry(obj.getLong("id"), obj.getString("category"), obj.getLong("timestamp")))
+                trackerEntries.add(TrackerEntry(obj.getLong("id"), obj.getString("category"), obj.getLong("timestamp"), if (obj.has("value")) obj.getDouble("value") else null))
             }
         } catch (e: Exception) {
             Log.w("Tracker", "Failed to load tracker entries", e)
@@ -3630,6 +3658,7 @@ class MainActivity : AppCompatActivity() {
                 put("id", e.id)
                 put("category", e.category)
                 put("timestamp", e.timestamp)
+                if (e.value != null) put("value", e.value)
             })
         }
         getSharedPreferences("baby_tracker", MODE_PRIVATE)
@@ -3688,6 +3717,30 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
+        // Weight summary
+        val weightEntries = trackerEntries.filter { it.category == "gewicht" && it.value != null }
+            .sortedByDescending { it.timestamp }
+        if (weightEntries.isNotEmpty()) {
+            val latest = weightEntries.first()
+            val latestValue = latest.value ?: 0.0
+            val latestStr = "${latestValue.toInt()} g"
+            val trendStr = if (weightEntries.size >= 2) {
+                val prev = weightEntries[1].value ?: 0.0
+                val diff = latestValue - prev
+                when {
+                    diff > 0 -> " ↑ +${diff.toInt()} g"
+                    diff < 0 -> " ↓ ${diff.toInt()} g"
+                    else -> " → ±0 g"
+                }
+            } else ""
+            summaryLayout.addView(TextView(this).apply {
+                text = "⚖️ Gewicht: $latestStr$trendStr  |  ${weightEntries.size} Messung(en)"
+                textSize = 14f
+                setTextColor(getColor(R.color.text_primary))
+                setPadding(0, 4, 0, 4)
+            })
+        }
+
         val recentLayout = binding.llTrackerEntries
         recentLayout.removeAllViews()
         val recent = trackerEntries.sortedByDescending { it.timestamp }.take(20)
@@ -3704,12 +3757,14 @@ class MainActivity : AppCompatActivity() {
                     "kaka" -> "💩"
                     "pipi" -> "💧"
                     "stillen" -> "🤱"
+                    "gewicht" -> "⚖️"
                     else -> "•"
                 }
                 val entryLabel = when (entry.category) {
                     "kaka" -> "Kaka"
                     "pipi" -> "Pipi"
                     "stillen" -> "Stillen"
+                    "gewicht" -> if (entry.value != null) "Gewicht: ${entry.value.toInt()} g" else "Gewicht"
                     else -> entry.category
                 }
                 val elapsed = now - entry.timestamp
