@@ -54,7 +54,8 @@ androidComponents {
     val appVersionCode = android.defaultConfig.versionCode ?: 1
     onVariants { variant ->
         variant.outputs.forEach { output ->
-            output.outputFileName.set("Geburt2026-$appVersionName-$appVersionCode.apk")
+            (output as? com.android.build.api.variant.impl.VariantOutputImpl)
+                ?.outputFileName?.set("Geburt2026-$appVersionName-$appVersionCode.apk")
         }
     }
 }
