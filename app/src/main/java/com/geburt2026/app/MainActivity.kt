@@ -190,6 +190,8 @@ class MainActivity : AppCompatActivity() {
     )
     private val customTimers = mutableListOf<CustomTimer>()
 
+    private val trackerEntries = mutableListOf<TrackerEntry>()
+
     // Editable notes list (in-memory backing)
     private val notizenItems = mutableListOf<Pair<Long, String>>()
 
@@ -216,7 +218,7 @@ class MainActivity : AppCompatActivity() {
     private val geburtPhasen: List<GeburtPhase> by lazy {
         listOf(
             GeburtPhase("🌅", "Latenzphase", "Unregelmäßige Wehen – Vorbereitung & Abwarten") { b ->
-                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
+                listOf(b.cardTimer, b.cardMilestones, b.cardLabor, b.cardNotes, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardAudioNotizen)
             },
             GeburtPhase("🌊", "Eröffnungsphase", "Regelmäßige Wehen – Gebärmutterhals öffnet sich") { b ->
                 listOf(b.cardTimer, b.cardMilestones, b.cardMedical, b.cardWishes, b.cardLabor, b.cardHospital, b.cardContacts, b.cardAudioNotizen)
@@ -228,10 +230,10 @@ class MainActivity : AppCompatActivity() {
                 listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
             },
             GeburtPhase("🍼", "Nachgeburtsphase", "Hep-B-Impfung, erste Stunden, Nachgeburt") { b ->
-                listOf(b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
+                listOf(b.cardTracker, b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
             },
             GeburtPhase("🏠", "Erste Tage Zuhause", "Ankommen – Wochenbett & Familie") { b ->
-                listOf(b.cardEckdaten, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardNotes, b.cardAudioNotizen)
+                listOf(b.cardTracker, b.cardEckdaten, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardNotes, b.cardAudioNotizen)
             },
         )
     }
@@ -276,6 +278,7 @@ class MainActivity : AppCompatActivity() {
         setupEckdaten()
         setupSearch()
         setupAudioNotizen()
+        setupTracker()
         setupPhasen()
         setupEinstellungen()
     }
@@ -2454,10 +2457,10 @@ class MainActivity : AppCompatActivity() {
     private fun applyPhase(index: Int) {
         val phase = geburtPhasen[index]
         val allCards = listOf(
-            binding.cardTimer, binding.cardMedical, binding.cardWishes,
+            binding.cardTimer, binding.cardMilestones, binding.cardMedical, binding.cardWishes,
             binding.cardLabor, binding.cardNotes, binding.cardKids,
             binding.cardBetreuung, binding.cardHospital, binding.cardChecklist,
-            binding.cardContacts, binding.cardAudioNotizen, binding.cardEckdaten
+            binding.cardContacts, binding.cardAudioNotizen, binding.cardEckdaten, binding.cardTracker
         )
         val visibleCards = phase.visibleCards(binding)
         allCards.forEach { card ->
@@ -2484,6 +2487,7 @@ class MainActivity : AppCompatActivity() {
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
     data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
     data class AudioNotiz(val id: Long, val phaseIndex: Int, val phaseName: String, val timestamp: Long, val audioFilePath: String, val transcription: String)
+    data class TrackerEntry(val id: Long, val category: String, val timestamp: Long)
 
     // ── Contact picker helpers ────────────────────────────────────────────────
 
@@ -3592,6 +3596,153 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Abbrechen", null)
             .show()
+    }
+
+    // ── Baby-Tracker ──────────────────────────────────────────────────────────
+
+    private fun setupTracker() {
+        loadTrackerEntries()
+        renderTracker()
+        binding.btnTrackerKaka.setOnClickListener { addTrackerEntry("kaka") }
+        binding.btnTrackerPipi.setOnClickListener { addTrackerEntry("pipi") }
+        binding.btnTrackerStillen.setOnClickListener { addTrackerEntry("stillen") }
+    }
+
+    private fun loadTrackerEntries() {
+        val prefs = getSharedPreferences("baby_tracker", MODE_PRIVATE)
+        val json = prefs.getString("entries", "[]") ?: "[]"
+        trackerEntries.clear()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                trackerEntries.add(TrackerEntry(obj.getLong("id"), obj.getString("category"), obj.getLong("timestamp")))
+            }
+        } catch (e: Exception) {
+            Log.w("Tracker", "Failed to load tracker entries", e)
+        }
+    }
+
+    private fun saveTrackerEntries() {
+        val arr = JSONArray()
+        trackerEntries.forEach { e ->
+            arr.put(JSONObject().apply {
+                put("id", e.id)
+                put("category", e.category)
+                put("timestamp", e.timestamp)
+            })
+        }
+        getSharedPreferences("baby_tracker", MODE_PRIVATE)
+            .edit().putString("entries", arr.toString()).apply()
+    }
+
+    private fun addTrackerEntry(category: String) {
+        val now = System.currentTimeMillis()
+        trackerEntries.add(TrackerEntry(now, category, now))
+        saveTrackerEntries()
+        renderTracker()
+        val label = when (category) {
+            "kaka" -> "💩 Kaka"
+            "pipi" -> "💧 Pipi"
+            "stillen" -> "🤱 Stillen"
+            else -> category
+        }
+        Toast.makeText(this, "$label eingetragen!", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun renderTracker() {
+        val now = System.currentTimeMillis()
+        val todayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val categories = listOf(
+            Triple("kaka", "💩", "Kaka"),
+            Triple("pipi", "💧", "Pipi"),
+            Triple("stillen", "🤱", "Stillen"),
+        )
+
+        val summaryLayout = binding.llTrackerSummary
+        summaryLayout.removeAllViews()
+        categories.forEach { (cat, emoji, label) ->
+            val todayCount = trackerEntries.count { it.category == cat && it.timestamp >= todayStart }
+            val lastEntry = trackerEntries.filter { it.category == cat }.maxByOrNull { it.timestamp }
+            val lastTimeStr = if (lastEntry != null) {
+                val elapsed = now - lastEntry.timestamp
+                val h = TimeUnit.MILLISECONDS.toHours(elapsed)
+                val m = TimeUnit.MILLISECONDS.toMinutes(elapsed) % 60
+                if (h > 0) "vor ${h}h ${m}min" else "vor ${m}min"
+            } else "–"
+            summaryLayout.addView(TextView(this).apply {
+                text = "$emoji $label: ${todayCount}x heute  |  zuletzt $lastTimeStr"
+                textSize = 14f
+                setTextColor(getColor(R.color.text_primary))
+                setPadding(0, 4, 0, 4)
+            })
+        }
+
+        val recentLayout = binding.llTrackerEntries
+        recentLayout.removeAllViews()
+        val recent = trackerEntries.sortedByDescending { it.timestamp }.take(20)
+        if (recent.isEmpty()) {
+            recentLayout.addView(TextView(this).apply {
+                text = "Noch keine Einträge"
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+            })
+        } else {
+            val sdf = SimpleDateFormat("dd.MM. HH:mm", Locale.GERMAN)
+            recent.forEach { entry ->
+                val entryEmoji = when (entry.category) {
+                    "kaka" -> "💩"
+                    "pipi" -> "💧"
+                    "stillen" -> "🤱"
+                    else -> "•"
+                }
+                val entryLabel = when (entry.category) {
+                    "kaka" -> "Kaka"
+                    "pipi" -> "Pipi"
+                    "stillen" -> "Stillen"
+                    else -> entry.category
+                }
+                val elapsed = now - entry.timestamp
+                val h = TimeUnit.MILLISECONDS.toHours(elapsed)
+                val m = TimeUnit.MILLISECONDS.toMinutes(elapsed) % 60
+                val elapsedStr = if (h > 0) "(vor ${h}h ${m}min)" else "(vor ${m}min)"
+                val rowLayout = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(0, 4, 0, 4)
+                }
+                val tv = TextView(this).apply {
+                    text = "$entryEmoji $entryLabel – ${sdf.format(Date(entry.timestamp))} $elapsedStr"
+                    textSize = 13f
+                    setTextColor(getColor(R.color.text_primary))
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val btnDel = Button(this).apply {
+                    text = "✕"
+                    textSize = 11f
+                    backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { it.setMargins(8, 0, 0, 0) }
+                    setPadding(12, 0, 12, 0)
+                    setOnClickListener {
+                        trackerEntries.removeAll { it.id == entry.id }
+                        saveTrackerEntries()
+                        renderTracker()
+                    }
+                }
+                rowLayout.addView(tv)
+                rowLayout.addView(btnDel)
+                recentLayout.addView(rowLayout)
+            }
+        }
     }
 
     companion object {

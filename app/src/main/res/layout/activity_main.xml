@@ -1606,6 +1606,101 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Baby-Tracker Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardTracker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_tracker">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="👶 Baby-Tracker"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="12dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingBottom="12dp">
+
+                    <Button
+                        android:id="@+id/btnTrackerKaka"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="4dp"
+                        android:text="💩 Kaka"
+                        android:textSize="13sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnTrackerPipi"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:text="💧 Pipi"
+                        android:textSize="13sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnTrackerStillen"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="🤱 Stillen"
+                        android:textSize="13sp"
+                        android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/llTrackerSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="12dp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider"
+                    android:layout_marginBottom="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Letzte Einträge:"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_dark"
+                    android:paddingBottom="6dp" />
+
+                <LinearLayout
+                    android:id="@+id/llTrackerEntries"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Einstellungen Card -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardEinstellungen"
