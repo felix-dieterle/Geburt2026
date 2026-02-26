@@ -3674,7 +3674,11 @@ class MainActivity : AppCompatActivity() {
                 val elapsed = now - lastEntry.timestamp
                 val h = TimeUnit.MILLISECONDS.toHours(elapsed)
                 val m = TimeUnit.MILLISECONDS.toMinutes(elapsed) % 60
-                if (h > 0) "vor ${h}h ${m}min" else "vor ${m}min"
+                when {
+                    h > 0 -> "vor ${h}h ${m}min"
+                    m > 0 -> "vor ${m}min"
+                    else -> "gerade eben"
+                }
             } else "–"
             summaryLayout.addView(TextView(this).apply {
                 text = "$emoji $label: ${todayCount}x heute  |  zuletzt $lastTimeStr"
@@ -3711,7 +3715,11 @@ class MainActivity : AppCompatActivity() {
                 val elapsed = now - entry.timestamp
                 val h = TimeUnit.MILLISECONDS.toHours(elapsed)
                 val m = TimeUnit.MILLISECONDS.toMinutes(elapsed) % 60
-                val elapsedStr = if (h > 0) "(vor ${h}h ${m}min)" else "(vor ${m}min)"
+                val elapsedStr = when {
+                    h > 0 -> "(vor ${h}h ${m}min)"
+                    m > 0 -> "(vor ${m}min)"
+                    else -> "(gerade eben)"
+                }
                 val rowLayout = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = android.view.Gravity.CENTER_VERTICAL
