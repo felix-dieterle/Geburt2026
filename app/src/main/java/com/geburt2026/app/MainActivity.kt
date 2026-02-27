@@ -466,7 +466,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Bitte Namen eingeben", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                val newId = "p_${System.currentTimeMillis()}"
+                val newId = UUID.randomUUID().toString().replace("-", "")
                 val newProfile = BirthProfile(id = newId, name = name, createdAt = System.currentTimeMillis())
                 val profiles = loadProfiles()
                 profiles.add(newProfile)
@@ -487,18 +487,29 @@ class MainActivity : AppCompatActivity() {
         setupBirthInfo()
         updateGeburtszeitDisplay()
         setupMilestoneTimers()
+        loadMedicalItemsIntoMemory()
         renderMedicalItems()
+        loadNotizenItemsIntoMemory()
         renderNotizenItems()
+        geburtswuensche.clear()
+        geburtswuensche.addAll(loadGeburtswuensceListe())
         renderGeburtswuensche()
+        customTimers.clear()
+        loadCustomTimers()
         renderCustomTimers()
+        tasks.clear()
+        tasks.addAll(loadTasks())
         setupChecklist()
         setupContacts()
         setupEckdaten()
         renderBetreuung()
         renderAudioNotizen()
+        currentPhaseIndex = profilePrefs("phasen").getInt("currentPhase", 0)
         applyPhase(currentPhaseIndex)
         setupKinderInfo()
         setupHospitalInfo()
+        loadTrackerEntries()
+        renderTracker()
     }
 
     private fun setupBirthInfo() {
@@ -1329,7 +1340,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNotizen() {
         // Migrate old single-text notes to list on first run
-        val oldPrefs = getSharedPreferences("notizen", MODE_PRIVATE)
+        val oldPrefs = profilePrefs("notizen")
         val listPrefs = profilePrefs(PREFS_NOTIZEN_LIST)
         if (!listPrefs.contains("items_json") && oldPrefs.contains("text")) {
             val oldText = oldPrefs.getString("text", "") ?: ""
@@ -2018,7 +2029,8 @@ class MainActivity : AppCompatActivity() {
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
                     override fun afterTextChanged(s: Editable?) {
                         onChanged(s?.toString() ?: "")
-                        tvKindTitle.text = if (kind.name.isNotEmpty()) "👶 ${kind.name}" else "👶 Kind ${index + 1}"
+                        val currentIdx = kinder.indexOf(kind)
+                        tvKindTitle.text = if (kind.name.isNotEmpty()) "👶 ${kind.name}" else "👶 Kind ${currentIdx + 1}"
                         saveKinder(kinder)
                     }
                 })
