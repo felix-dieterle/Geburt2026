@@ -3367,6 +3367,16 @@ class MainActivity : AppCompatActivity() {
             if (einleitungNotes.isNotEmpty()) { appendLine("=== Notizen zur Einleitung ==="); appendLine(einleitungNotes); appendLine() }
             if (wehenUnregNotes.isNotEmpty()) { appendLine("=== Notizen Wehen unregelmäßig ==="); appendLine(wehenUnregNotes); appendLine() }
             if (wehenRegNotes.isNotEmpty()) { appendLine("=== Notizen Wehen regelmäßig ==="); appendLine(wehenRegNotes); appendLine() }
+            val weightEntries = trackerEntries.filter { it.category == "gewicht" && it.value != null }
+                .sortedBy { it.timestamp }
+            if (weightEntries.isNotEmpty()) {
+                val sdfEntry = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+                appendLine("=== Gewichtsverlauf ===")
+                weightEntries.forEach { e ->
+                    appendLine("• ${sdfEntry.format(Date(e.timestamp))} – ${e.value!!.toInt()} g")
+                }
+                appendLine()
+            }
         }
     }
 
@@ -3610,21 +3620,32 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showWeightInputDialog() {
-        val editText = EditText(this).apply {
-            hint = "z.B. 3250"
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        var selectedTime = System.currentTimeMillis()
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(48, 24, 48, 8)
         }
-        AlertDialog.Builder(this)
+        val weightEdit = EditText(this).apply {
+            hint = "z.B. 3250"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+        val dateBtn = Button(this).apply {
+            text = "📅 ${sdf.format(Date(selectedTime))}"
+        }
+        container.addView(weightEdit)
+        container.addView(dateBtn)
+
+        val dialog = AlertDialog.Builder(this)
             .setTitle("⚖️ Gewicht erfassen")
             .setMessage("Gewicht in Gramm eingeben:")
-            .setView(editText)
+            .setView(container)
             .setPositiveButton("Speichern") { _, _ ->
-                val input = editText.text.toString().trim()
+                val input = weightEdit.text.toString().trim()
                 val weightG = input.toDoubleOrNull()
                 if (weightG != null && weightG > 0) {
-                    val now = System.currentTimeMillis()
-                    trackerEntries.add(TrackerEntry(now, "gewicht", now, weightG))
+                    trackerEntries.add(TrackerEntry(System.currentTimeMillis(), "gewicht", selectedTime, weightG))
                     saveTrackerEntries()
                     renderTracker()
                     Toast.makeText(this, "⚖️ Gewicht ${weightG.toInt()} g eingetragen!", Toast.LENGTH_SHORT).show()
@@ -3633,7 +3654,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .setNegativeButton("Abbrechen", null)
-            .show()
+            .create()
+
+        dateBtn.setOnClickListener {
+            val cal = Calendar.getInstance().apply { timeInMillis = selectedTime }
+            showDateTimePicker(cal) { newCal ->
+                selectedTime = newCal.timeInMillis
+                dateBtn.text = "📅 ${sdf.format(Date(selectedTime))}"
+            }
+        }
+
+        dialog.show()
     }
 
     private fun loadTrackerEntries() {
