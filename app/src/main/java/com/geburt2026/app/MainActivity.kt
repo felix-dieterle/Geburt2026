@@ -215,6 +215,9 @@ class MainActivity : AppCompatActivity() {
 
     private val geburtswuensche = mutableListOf<String>()
 
+    private var activeProfileId: String = ""
+    private val kinder = mutableListOf<Kind>()
+
     private val geburtPhasen: List<GeburtPhase> by lazy {
         listOf(
             GeburtPhase("🌅", "Latenzphase", "Unregelmäßige Wehen – Vorbereitung & Abwarten") { b ->
@@ -261,6 +264,7 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        setupProfileSwitcher()
         loadSettings()
         setupBirthInfo()
         setupGeburtszeit()
@@ -302,7 +306,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadSettings() {
-        val prefs = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_SETTINGS)
         // Due date
         val defaultDueDateMillis = Calendar.getInstance().apply {
             set(DEFAULT_DUE_DATE_YEAR, DEFAULT_DUE_DATE_MONTH, DEFAULT_DUE_DATE_DAY, 0, 0, 0)
@@ -324,7 +328,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveSettings() {
-        getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE).edit()
+        profilePrefs(PREFS_SETTINGS).edit()
             .putLong("due_date_millis", dueDateCalendar.timeInMillis)
             .putInt("blasensprung_warn_orange_h", blasensprungWarnOrangeH)
             .putInt("blasensprung_warn_red_h", blasensprungWarnRedH)
@@ -338,6 +342,12 @@ class MainActivity : AppCompatActivity() {
             .putString("opnv_url", opnvUrl)
             .apply()
     }
+
+    private fun profilePrefs(name: String) =
+        getSharedPreferences(
+            if (activeProfileId.isEmpty()) name else "${name}_$activeProfileId",
+            MODE_PRIVATE
+        )
 
     private fun updateBirthTimer() {
         val now = System.currentTimeMillis()
@@ -370,8 +380,140 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ── Birth Profile Management ──────────────────────────────────────────────
+
+    private fun loadProfiles(): MutableList<BirthProfile> {
+        val prefs = getSharedPreferences(PREFS_PROFILES_GLOBAL, MODE_PRIVATE)
+        val json = prefs.getString("profiles_json", null)
+        if (json == null) {
+            val defaultProfile = BirthProfile(id = "", name = "Geburt 2026", createdAt = System.currentTimeMillis())
+            val list = mutableListOf(defaultProfile)
+            saveProfiles(list)
+            return list
+        }
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                BirthProfile(id = obj.getString("id"), name = obj.getString("name"), createdAt = obj.getLong("createdAt"))
+            }.toMutableList()
+        } catch (e: Exception) {
+            mutableListOf(BirthProfile("", "Geburt 2026", System.currentTimeMillis()))
+        }
+    }
+
+    private fun saveProfiles(profiles: List<BirthProfile>) {
+        val arr = JSONArray()
+        profiles.forEach { p ->
+            arr.put(JSONObject().apply {
+                put("id", p.id)
+                put("name", p.name)
+                put("createdAt", p.createdAt)
+            })
+        }
+        getSharedPreferences(PREFS_PROFILES_GLOBAL, MODE_PRIVATE)
+            .edit().putString("profiles_json", arr.toString()).apply()
+    }
+
+    private fun setupProfileSwitcher() {
+        val globalPrefs = getSharedPreferences(PREFS_PROFILES_GLOBAL, MODE_PRIVATE)
+        activeProfileId = globalPrefs.getString("active_profile_id", "") ?: ""
+        updateProfileNameDisplay()
+
+        binding.btnSwitchProfile.setOnClickListener { showSwitchProfileDialog() }
+        binding.btnNewProfile.setOnClickListener { showNewProfileDialog() }
+    }
+
+    private fun updateProfileNameDisplay() {
+        val profiles = loadProfiles()
+        val active = profiles.firstOrNull { it.id == activeProfileId }
+            ?: profiles.firstOrNull()
+        binding.tvActiveProfileName.text = "🍼 ${active?.name ?: "Geburt 2026"}"
+    }
+
+    private fun showSwitchProfileDialog() {
+        val profiles = loadProfiles()
+        val names = profiles.map { it.name }.toTypedArray()
+        val currentIdx = profiles.indexOfFirst { it.id == activeProfileId }.coerceAtLeast(0)
+        AlertDialog.Builder(this)
+            .setTitle("Geburtsprofil wechseln")
+            .setSingleChoiceItems(names, currentIdx) { dialog, which ->
+                val selected = profiles[which]
+                activeProfileId = selected.id
+                getSharedPreferences(PREFS_PROFILES_GLOBAL, MODE_PRIVATE)
+                    .edit().putString("active_profile_id", activeProfileId).apply()
+                dialog.dismiss()
+                reloadAllData()
+                updateProfileNameDisplay()
+                Toast.makeText(this, "Profil: ${selected.name}", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun showNewProfileDialog() {
+        val editText = EditText(this).apply {
+            hint = "Name des Profils (z.B. Geburt März 2026)"
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            setPadding(48, 24, 48, 8)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Neues Geburtsprofil")
+            .setView(editText)
+            .setPositiveButton("Erstellen") { _, _ ->
+                val name = editText.text.toString().trim()
+                if (name.isEmpty()) {
+                    Toast.makeText(this, "Bitte Namen eingeben", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                val newId = UUID.randomUUID().toString().replace("-", "")
+                val newProfile = BirthProfile(id = newId, name = name, createdAt = System.currentTimeMillis())
+                val profiles = loadProfiles()
+                profiles.add(newProfile)
+                saveProfiles(profiles)
+                activeProfileId = newId
+                getSharedPreferences(PREFS_PROFILES_GLOBAL, MODE_PRIVATE)
+                    .edit().putString("active_profile_id", newId).apply()
+                reloadAllData()
+                updateProfileNameDisplay()
+                Toast.makeText(this, "Profil \"$name\" erstellt", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun reloadAllData() {
+        loadSettings()
+        setupBirthInfo()
+        updateGeburtszeitDisplay()
+        setupMilestoneTimers()
+        loadMedicalItemsIntoMemory()
+        renderMedicalItems()
+        loadNotizenItemsIntoMemory()
+        renderNotizenItems()
+        geburtswuensche.clear()
+        geburtswuensche.addAll(loadGeburtswuensceListe())
+        renderGeburtswuensche()
+        customTimers.clear()
+        loadCustomTimers()
+        renderCustomTimers()
+        tasks.clear()
+        tasks.addAll(loadTasks())
+        setupChecklist()
+        setupContacts()
+        setupEckdaten()
+        renderBetreuung()
+        renderAudioNotizen()
+        currentPhaseIndex = profilePrefs("phasen").getInt("currentPhase", 0)
+        applyPhase(currentPhaseIndex)
+        setupKinderInfo()
+        setupHospitalInfo()
+        loadTrackerEntries()
+        renderTracker()
+    }
+
     private fun setupBirthInfo() {
-        val blasensprungPrefs = getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE)
+        val blasensprungPrefs = profilePrefs(PREFS_BLASENSPRUNG)
         blasensprungTime = blasensprungPrefs.getLong("timestamp", blasensprungDefault)
 
         val sdfDateTime = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
@@ -402,7 +544,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupGeburtszeit() {
-        val prefs = getSharedPreferences("geburtszeit", MODE_PRIVATE)
+        val prefs = profilePrefs("geburtszeit")
         geburtszeit = prefs.getLong("timestamp", 0L)
         updateGeburtszeitDisplay()
         binding.btnSetGeburtszeit.setOnClickListener {
@@ -444,7 +586,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupMilestoneTimers() {
-        val prefs = getSharedPreferences("milestones", MODE_PRIVATE)
+        val prefs = profilePrefs("milestones")
         einleitungStartTime = prefs.getLong("einleitung", 0L)
         wehenUnregelStartTime = prefs.getLong("wehen_unregelmaessig", 0L)
         wehenRegelStartTime = prefs.getLong("wehen_regelmaessig", 0L)
@@ -657,7 +799,7 @@ class MainActivity : AppCompatActivity() {
     // ── Custom timers ─────────────────────────────────────────────────────────
 
     private fun loadCustomTimers() {
-        val prefs = getSharedPreferences("custom_timers", MODE_PRIVATE)
+        val prefs = profilePrefs("custom_timers")
         val json = prefs.getString("timers_json", null) ?: return
         try {
             val arr = JSONArray(json)
@@ -691,7 +833,7 @@ class MainActivity : AppCompatActivity() {
             obj.put("comment", t.comment)
             arr.put(obj)
         }
-        getSharedPreferences("custom_timers", MODE_PRIVATE)
+        profilePrefs("custom_timers")
             .edit().putString("timers_json", arr.toString()).apply()
     }
 
@@ -932,7 +1074,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupMedicalInfo() {
-        val prefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_MEDICAL_LIST)
         if (!prefs.contains("items_json")) {
             val defaultItems = listOf(
                 "Mutter: Chron. Hepatitis B, niederschwellig aktiv",
@@ -956,7 +1098,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadMedicalItemsIntoMemory() {
-        val prefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_MEDICAL_LIST)
         val json = prefs.getString("items_json", "[]") ?: "[]"
         medicalItems.clear()
         try {
@@ -978,7 +1120,7 @@ class MainActivity : AppCompatActivity() {
             obj.put("text", text)
             arr.put(obj)
         }
-        getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        profilePrefs(PREFS_MEDICAL_LIST)
             .edit().putString("items_json", arr.toString()).apply()
     }
 
@@ -1057,7 +1199,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadGeburtswuensceListe(): List<String> {
-        val prefs = getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_GEBURTSWUENSCHE)
         val json = prefs.getString("items_json", null)
         if (json != null) {
             return try {
@@ -1077,7 +1219,7 @@ class MainActivity : AppCompatActivity() {
     private fun saveGeburtswuensche(list: List<String>) {
         val arr = JSONArray()
         list.forEach { arr.put(it) }
-        getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE)
+        profilePrefs(PREFS_GEBURTSWUENSCHE)
             .edit().putString("items_json", arr.toString()).apply()
     }
 
@@ -1198,8 +1340,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupNotizen() {
         // Migrate old single-text notes to list on first run
-        val oldPrefs = getSharedPreferences("notizen", MODE_PRIVATE)
-        val listPrefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        val oldPrefs = profilePrefs("notizen")
+        val listPrefs = profilePrefs(PREFS_NOTIZEN_LIST)
         if (!listPrefs.contains("items_json") && oldPrefs.contains("text")) {
             val oldText = oldPrefs.getString("text", "") ?: ""
             if (oldText.isNotEmpty()) {
@@ -1233,7 +1375,7 @@ class MainActivity : AppCompatActivity() {
         renderNotizenItems()
         binding.btnAddNotiz.setOnClickListener { addNotizenItem() }
 
-        val einleitungPrefs = getSharedPreferences("einleitung_notizen", MODE_PRIVATE)
+        val einleitungPrefs = profilePrefs("einleitung_notizen")
         binding.etEinleitungNotizen.setText(einleitungPrefs.getString("text", ""))
         binding.etEinleitungNotizen.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -1243,7 +1385,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        val wehenUnregelPrefs = getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE)
+        val wehenUnregelPrefs = profilePrefs("wehen_unregelmaessig_notizen")
         binding.etWehenUnregelNotizen.setText(wehenUnregelPrefs.getString("text", ""))
         binding.etWehenUnregelNotizen.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -1253,7 +1395,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        val wehenRegelPrefs = getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE)
+        val wehenRegelPrefs = profilePrefs("wehen_regelmaessig_notizen")
         binding.etWehenRegelNotizen.setText(wehenRegelPrefs.getString("text", ""))
         binding.etWehenRegelNotizen.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -1265,7 +1407,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadNotizenItemsIntoMemory() {
-        val prefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_NOTIZEN_LIST)
         val json = prefs.getString("items_json", "[]") ?: "[]"
         notizenItems.clear()
         try {
@@ -1287,7 +1429,7 @@ class MainActivity : AppCompatActivity() {
             obj.put("text", text)
             arr.put(obj)
         }
-        getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        profilePrefs(PREFS_NOTIZEN_LIST)
             .edit().putString("items_json", arr.toString()).apply()
     }
 
@@ -1369,7 +1511,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupKinderInfo() {
-        val prefs = getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_KINDER_INFO)
         val defaultText = buildString {
             appendLine("👦 Kind 1: 7 Jahre")
             appendLine("👧 Kind 2: 4 Jahre")
@@ -1421,7 +1563,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupHospitalInfo() {
-        val prefs = getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_HOSPITAL_INFO)
         val defaultText = buildString {
             appendLine("🏥 Hegau-Bodensee-Klinikum Singen")
             appendLine("   📞 Zentrale: 07731 89-0")
@@ -1553,7 +1695,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadTasks(): List<Task> {
-        val prefs = getSharedPreferences("checklist", MODE_PRIVATE)
+        val prefs = profilePrefs("checklist")
         val json = prefs.getString("tasks", null)
         if (json != null) {
             return try {
@@ -1578,14 +1720,14 @@ class MainActivity : AppCompatActivity() {
                 put("done", t.done)
             })
         }
-        getSharedPreferences("checklist", MODE_PRIVATE)
+        profilePrefs("checklist")
             .edit()
             .putString("tasks", array.toString())
             .apply()
     }
 
     private fun setupContacts() {
-        val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val prefs = profilePrefs("contacts")
         val contacts = listOf(
             Contact("Oma/Opa", prefs.getString("Oma/Opa", "") ?: "", editable = true),
             Contact("Hebamme", prefs.getString("Hebamme", "") ?: "", editable = true),
@@ -1660,7 +1802,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showEditContactDialog(contactName: String) {
-        val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val prefs = profilePrefs("contacts")
         val currentNumber = prefs.getString(contactName, "") ?: ""
         val dialogLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1696,47 +1838,260 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupEckdaten() {
-        val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+    // ── Kinder (multiple children per birth) ─────────────────────────────────
 
-        // Restore saved values
-        binding.etBabyName.setText(prefs.getString("name", ""))
-        binding.etBabyGewicht.setText(prefs.getString("gewicht_g", ""))
-        binding.etBabyGroesse.setText(prefs.getString("groesse_cm", ""))
-        binding.etBabyKopfumfang.setText(prefs.getString("kopfumfang_cm", ""))
-        binding.etApgar1.setText(prefs.getString("apgar_1", ""))
-        binding.etApgar5.setText(prefs.getString("apgar_5", ""))
-        binding.etApgar10.setText(prefs.getString("apgar_10", ""))
-        binding.etGeburtsart.setText(prefs.getString("geburtsart", ""))
-        binding.etGeburtsort.setText(prefs.getString("geburtsort", ""))
-        binding.etBlutgruppe.setText(prefs.getString("blutgruppe", ""))
-        binding.etEckdatenNotizen.setText(prefs.getString("notizen", ""))
+    private fun loadKinder(): MutableList<Kind> {
+        val prefs = profilePrefs(PREFS_KINDER_LIST)
+        val json = prefs.getString("kinder_json", null)
+        // Migration: if no kinder list yet but old eckdaten exist, migrate them
+        if (json == null) {
+            val eckPrefs = profilePrefs("eckdaten")
+            val hasMigration = eckPrefs.contains("name") || eckPrefs.contains("gewicht_g")
+            if (hasMigration) {
+                val kind = Kind(
+                    id = System.currentTimeMillis(),
+                    name = eckPrefs.getString("name", "") ?: "",
+                    gewichtG = eckPrefs.getString("gewicht_g", "") ?: "",
+                    groesseCm = eckPrefs.getString("groesse_cm", "") ?: "",
+                    kopfumfangCm = eckPrefs.getString("kopfumfang_cm", "") ?: "",
+                    apgar1 = eckPrefs.getString("apgar_1", "") ?: "",
+                    apgar5 = eckPrefs.getString("apgar_5", "") ?: "",
+                    apgar10 = eckPrefs.getString("apgar_10", "") ?: "",
+                    geburtsart = eckPrefs.getString("geburtsart", "") ?: "",
+                    geburtsort = eckPrefs.getString("geburtsort", "") ?: "",
+                    blutgruppe = eckPrefs.getString("blutgruppe", "") ?: "",
+                    geburtszeit = profilePrefs("geburtszeit").getLong("timestamp", 0L),
+                    notizen = eckPrefs.getString("notizen", "") ?: ""
+                )
+                val list = mutableListOf(kind)
+                saveKinder(list)
+                return list
+            }
+            return mutableListOf()
+        }
+        return try {
+            val arr = JSONArray(json)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                Kind(
+                    id = obj.getLong("id"),
+                    name = obj.optString("name", ""),
+                    gewichtG = obj.optString("gewichtG", ""),
+                    groesseCm = obj.optString("groesseCm", ""),
+                    kopfumfangCm = obj.optString("kopfumfangCm", ""),
+                    apgar1 = obj.optString("apgar1", ""),
+                    apgar5 = obj.optString("apgar5", ""),
+                    apgar10 = obj.optString("apgar10", ""),
+                    geburtsart = obj.optString("geburtsart", ""),
+                    geburtsort = obj.optString("geburtsort", ""),
+                    blutgruppe = obj.optString("blutgruppe", ""),
+                    geburtszeit = obj.optLong("geburtszeit", 0L),
+                    notizen = obj.optString("notizen", "")
+                )
+            }.toMutableList()
+        } catch (e: Exception) {
+            Log.e("Kinder", "Failed to load kinder", e)
+            mutableListOf()
+        }
+    }
 
-        // Auto-save helper
-        fun saveField(key: String, view: EditText) {
-            view.addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                override fun afterTextChanged(s: Editable?) {
-                    prefs.edit().putString(key, s?.toString() ?: "").apply()
-                }
+    private fun saveKinder(list: List<Kind>) {
+        val arr = JSONArray()
+        list.forEach { k ->
+            arr.put(JSONObject().apply {
+                put("id", k.id)
+                put("name", k.name)
+                put("gewichtG", k.gewichtG)
+                put("groesseCm", k.groesseCm)
+                put("kopfumfangCm", k.kopfumfangCm)
+                put("apgar1", k.apgar1)
+                put("apgar5", k.apgar5)
+                put("apgar10", k.apgar10)
+                put("geburtsart", k.geburtsart)
+                put("geburtsort", k.geburtsort)
+                put("blutgruppe", k.blutgruppe)
+                put("geburtszeit", k.geburtszeit)
+                put("notizen", k.notizen)
             })
         }
+        profilePrefs(PREFS_KINDER_LIST).edit().putString("kinder_json", arr.toString()).apply()
+    }
 
-        saveField("name", binding.etBabyName)
-        saveField("gewicht_g", binding.etBabyGewicht)
-        saveField("groesse_cm", binding.etBabyGroesse)
-        saveField("kopfumfang_cm", binding.etBabyKopfumfang)
-        saveField("apgar_1", binding.etApgar1)
-        saveField("apgar_5", binding.etApgar5)
-        saveField("apgar_10", binding.etApgar10)
-        saveField("geburtsart", binding.etGeburtsart)
-        saveField("geburtsort", binding.etGeburtsort)
-        saveField("blutgruppe", binding.etBlutgruppe)
-        saveField("notizen", binding.etEckdatenNotizen)
-
+    private fun setupEckdaten() {
+        kinder.clear()
+        kinder.addAll(loadKinder())
+        renderKinder()
+        binding.btnAddKind.setOnClickListener {
+            kinder.add(Kind(id = System.currentTimeMillis()))
+            saveKinder(kinder)
+            renderKinder()
+        }
         setupPhotos()
         binding.btnExportUrkunde.setOnClickListener { exportUrkunde() }
+    }
+
+    private fun renderKinder() {
+        val container = binding.llKinderContainer
+        container.removeAllViews()
+        if (kinder.isEmpty()) {
+            val tv = TextView(this).apply {
+                text = "Noch keine Kinder eingetragen. Tippe auf '+ Kind hinzufügen'."
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 4, 0, 12)
+            }
+            container.addView(tv)
+            return
+        }
+        kinder.forEachIndexed { index, kind ->
+            val kindCard = buildKindCard(kind, index)
+            container.addView(kindCard)
+        }
+    }
+
+    private fun buildKindCard(kind: Kind, index: Int): android.view.View {
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+        val cardLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).also { it.setMargins(0, 0, 0, 12) }
+        }
+
+        // Header row with kind number and delete button
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setBackgroundColor(getColor(R.color.primary_light))
+            setPadding(12, 8, 12, 8)
+        }
+        val tvKindTitle = TextView(this).apply {
+            text = if (kind.name.isNotEmpty()) "👶 ${kind.name}" else "👶 Kind ${index + 1}"
+            textSize = 15f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(getColor(R.color.primary_dark))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val btnDelete = Button(this).apply {
+            text = "✕"
+            textSize = 11f
+            backgroundTintList = ColorStateList.valueOf(getColor(R.color.warning_red))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnClickListener {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Kind entfernen?")
+                    .setPositiveButton("Entfernen") { _, _ ->
+                        kinder.removeAll { it.id == kind.id }
+                        saveKinder(kinder)
+                        renderKinder()
+                    }
+                    .setNegativeButton("Abbrechen", null)
+                    .show()
+            }
+        }
+        headerRow.addView(tvKindTitle)
+        headerRow.addView(btnDelete)
+        cardLayout.addView(headerRow)
+
+        val fieldsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(12, 8, 12, 8)
+            setBackgroundColor(getColor(R.color.white))
+        }
+
+        fun addField(label: String, value: String, inputType: Int, onChanged: (String) -> Unit): EditText {
+            fieldsLayout.addView(TextView(this).apply {
+                text = label
+                textSize = 12f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 4, 0, 0)
+            })
+            return EditText(this).apply {
+                setText(value)
+                this.inputType = inputType
+                textSize = 14f
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setPadding(0, 2, 0, 4)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        onChanged(s?.toString() ?: "")
+                        val currentIdx = kinder.indexOf(kind)
+                        tvKindTitle.text = if (kind.name.isNotEmpty()) "👶 ${kind.name}" else "👶 Kind ${currentIdx + 1}"
+                        saveKinder(kinder)
+                    }
+                })
+                fieldsLayout.addView(this)
+            }
+        }
+
+        addField("👶 Name", kind.name, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS) { kind.name = it }
+        addField("⚖️ Gewicht (g)", kind.gewichtG, InputType.TYPE_CLASS_NUMBER) { kind.gewichtG = it }
+        addField("📏 Länge (cm)", kind.groesseCm, InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL) { kind.groesseCm = it }
+        addField("🔵 Kopfumfang (cm)", kind.kopfumfangCm, InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL) { kind.kopfumfangCm = it }
+        addField("🍼 Geburtsart", kind.geburtsart, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) { kind.geburtsart = it }
+        addField("🏥 Geburtsort", kind.geburtsort, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS) { kind.geburtsort = it }
+        addField("🩸 Blutgruppe", kind.blutgruppe, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) { kind.blutgruppe = it }
+        addField("💗 APGAR 1 min (0–10)", kind.apgar1, InputType.TYPE_CLASS_NUMBER) { kind.apgar1 = it }
+        addField("💗 APGAR 5 min (0–10)", kind.apgar5, InputType.TYPE_CLASS_NUMBER) { kind.apgar5 = it }
+        addField("💗 APGAR 10 min (0–10)", kind.apgar10, InputType.TYPE_CLASS_NUMBER) { kind.apgar10 = it }
+        addField("📝 Notizen", kind.notizen, InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) { kind.notizen = it }
+
+        // Geburtszeit field
+        fieldsLayout.addView(TextView(this).apply {
+            text = "📅 Geburtszeit"
+            textSize = 12f
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, 4, 0, 0)
+        })
+        val tvGeburtszeit = TextView(this).apply {
+            text = if (kind.geburtszeit > 0L) sdf.format(Date(kind.geburtszeit)) else "– (antippen zum Setzen)"
+            textSize = 14f
+            setTextColor(if (kind.geburtszeit > 0L) getColor(R.color.text_primary) else getColor(R.color.link_blue))
+            setPadding(0, 2, 0, 8)
+            setOnClickListener {
+                val options = arrayOf("Datum & Uhrzeit wählen", "Zurücksetzen")
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("👶 Geburtszeit")
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> {
+                                val cal = if (kind.geburtszeit > 0L) Calendar.getInstance().apply { timeInMillis = kind.geburtszeit } else Calendar.getInstance()
+                                showDateTimePicker(cal) { newCal ->
+                                    kind.geburtszeit = newCal.timeInMillis
+                                    this.text = sdf.format(Date(kind.geburtszeit))
+                                    this.setTextColor(getColor(R.color.text_primary))
+                                    saveKinder(kinder)
+                                }
+                            }
+                            1 -> {
+                                kind.geburtszeit = 0L
+                                this.text = "– (antippen zum Setzen)"
+                                this.setTextColor(getColor(R.color.link_blue))
+                                saveKinder(kinder)
+                            }
+                        }
+                    }
+                    .show()
+            }
+        }
+        fieldsLayout.addView(tvGeburtszeit)
+
+        cardLayout.addView(fieldsLayout)
+        return cardLayout
     }
 
     private fun setupPhotos() {
@@ -1810,7 +2165,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadPhotoPathsIntoMemory() {
-        val prefs = getSharedPreferences(PREFS_PHOTOS, MODE_PRIVATE)
+        val prefs = profilePrefs(PREFS_PHOTOS)
         val json = prefs.getString("paths_json", "[]") ?: "[]"
         photoPaths.clear()
         try {
@@ -1827,7 +2182,7 @@ class MainActivity : AppCompatActivity() {
     private fun savePhotoPaths() {
         val arr = JSONArray()
         photoPaths.forEach { arr.put(it) }
-        getSharedPreferences(PREFS_PHOTOS, MODE_PRIVATE)
+        profilePrefs(PREFS_PHOTOS)
             .edit().putString("paths_json", arr.toString()).apply()
     }
 
@@ -1900,26 +2255,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exportUrkunde() {
-        val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
         val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
-
-        fun field(key: String, suffix: String = "") =
-            prefs.getString(key, "")?.trim()?.takeIf { it.isNotEmpty() }
-                ?.let { if (suffix.isEmpty()) it else "$it $suffix" } ?: "–"
-
-        val name = field("name")
-        val gewicht = field("gewicht_g", "g")
-        val groesse = field("groesse_cm", "cm")
-        val kopfumfang = field("kopfumfang_cm", "cm")
-        val apgar1 = field("apgar_1")
-        val apgar5 = field("apgar_5")
-        val apgar10 = field("apgar_10")
-        val geburtsart = field("geburtsart")
-        val geburtsort = field("geburtsort")
-        val blutgruppe = field("blutgruppe")
-        val notizen = prefs.getString("notizen", "")?.trim()
-
-        val geburtszeitStr = if (geburtszeit > 0L) sdf.format(Date(geburtszeit)) + " Uhr" else "–"
+        val kinderList = loadKinder()
+        val primaryKind = kinderList.firstOrNull()
+        val primaryName = primaryKind?.name?.takeIf { it.isNotEmpty() } ?: "–"
 
         // SSW at birth
         val lmpCal = dueDateCalendar.clone() as Calendar
@@ -1952,21 +2291,33 @@ class MainActivity : AppCompatActivity() {
             appendLine("       GEBURTSURKUNDE 2026")
             appendLine("   ══════════════════════════════")
             appendLine()
-            appendLine("👶  Name:            $name")
-            appendLine("📅  Geburtszeitpunkt: $geburtszeitStr")
-            appendLine("🏥  Geburtsort:       $geburtsort")
-            appendLine("🍼  Geburtsart:       $geburtsart")
-            appendLine()
-            appendLine("⚖️  Gewicht:          $gewicht")
-            appendLine("📏  Körperlänge:      $groesse")
-            appendLine("🔵  Kopfumfang:       $kopfumfang")
-            appendLine("🩸  Blutgruppe:       $blutgruppe")
-            appendLine()
-            appendLine("💗  APGAR-Werte:")
-            appendLine("      1 Minute:    $apgar1 / 10")
-            appendLine("      5 Minuten:   $apgar5 / 10")
-            appendLine("     10 Minuten:   $apgar10 / 10")
-            appendLine()
+            kinderList.forEachIndexed { idx, k ->
+                if (kinderList.size > 1) appendLine("─── Kind ${idx + 1} ───────────────────────")
+                appendLine("👶  Name:            ${k.name.ifEmpty { "–" }}")
+                val gzStr = if (k.geburtszeit > 0L) sdf.format(Date(k.geburtszeit)) + " Uhr" else "–"
+                appendLine("📅  Geburtszeitpunkt: $gzStr")
+                appendLine("🏥  Geburtsort:       ${k.geburtsort.ifEmpty { "–" }}")
+                appendLine("🍼  Geburtsart:       ${k.geburtsart.ifEmpty { "–" }}")
+                appendLine()
+                appendLine("⚖️  Gewicht:          ${k.gewichtG.takeIf { it.isNotEmpty() }?.let { "$it g" } ?: "–"}")
+                appendLine("📏  Körperlänge:      ${k.groesseCm.takeIf { it.isNotEmpty() }?.let { "$it cm" } ?: "–"}")
+                appendLine("🔵  Kopfumfang:       ${k.kopfumfangCm.takeIf { it.isNotEmpty() }?.let { "$it cm" } ?: "–"}")
+                appendLine("🩸  Blutgruppe:       ${k.blutgruppe.ifEmpty { "–" }}")
+                appendLine()
+                appendLine("💗  APGAR-Werte:")
+                appendLine("      1 Minute:    ${k.apgar1.ifEmpty { "–" }} / 10")
+                appendLine("      5 Minuten:   ${k.apgar5.ifEmpty { "–" }} / 10")
+                appendLine("     10 Minuten:   ${k.apgar10.ifEmpty { "–" }} / 10")
+                if (k.notizen.isNotEmpty()) {
+                    appendLine()
+                    appendLine("📝  Notizen: ${k.notizen}")
+                }
+                appendLine()
+            }
+            if (kinderList.isEmpty()) {
+                appendLine("👶  (Keine Kinder eingetragen)")
+                appendLine()
+            }
             appendLine("──────────────────────────────────")
             appendLine("🤰  Schwangerschaftswoche: $sswStr")
             appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
@@ -1996,12 +2347,6 @@ class MainActivity : AppCompatActivity() {
                 }
                 appendLine()
             }
-            if (!notizen.isNullOrEmpty()) {
-                appendLine()
-                appendLine("📝  Notizen:")
-                appendLine(notizen)
-                appendLine()
-            }
             if (photoPaths.isNotEmpty()) {
                 appendLine()
                 appendLine("📷  Fotos: ${photoPaths.size} Foto(s) gespeichert")
@@ -2013,7 +2358,7 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
-            putExtra(Intent.EXTRA_SUBJECT, "Geburtsurkunde – $name")
+            putExtra(Intent.EXTRA_SUBJECT, "Geburtsurkunde – $primaryName")
         }
         startActivity(Intent.createChooser(intent, "Zusammenfassung teilen"))
     }
@@ -2063,7 +2408,7 @@ class MainActivity : AppCompatActivity() {
             SearchSection(
                 "📞 Kontakte",
                 {
-                    val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+                    val prefs = profilePrefs("contacts")
                     EDITABLE_CONTACT_KEYS
                         .joinToString(" ") { "$it ${prefs.getString(it, "") ?: ""}" } +
                         " KH Konstanz KH Singen KH Überlingen Kreissaal Notruf"
@@ -2073,9 +2418,9 @@ class MainActivity : AppCompatActivity() {
             SearchSection(
                 "👶 Eckdaten – Geburt & Kind",
                 {
-                    val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
-                    listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "geburtsart", "geburtsort", "blutgruppe", "notizen")
-                        .joinToString(" ") { prefs.getString(it, "") ?: "" }
+                    kinder.joinToString(" ") { k ->
+                        listOf(k.name, k.gewichtG, k.groesseCm, k.kopfumfangCm, k.geburtsart, k.geburtsort, k.blutgruppe, k.notizen).joinToString(" ")
+                    }
                 },
                 binding.cardEckdaten
             ),
@@ -2380,7 +2725,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadBetreuungsEintraege(): List<BetreuungsEintrag> {
-        val prefs = getSharedPreferences("betreuung", MODE_PRIVATE)
+        val prefs = profilePrefs("betreuung")
         val json = prefs.getString("eintraege", "[]") ?: "[]"
         return try {
             val array = JSONArray(json)
@@ -2425,14 +2770,14 @@ class MainActivity : AppCompatActivity() {
                 put("phone", e.phone)
             })
         }
-        getSharedPreferences("betreuung", MODE_PRIVATE)
+        profilePrefs("betreuung")
             .edit()
             .putString("eintraege", array.toString())
             .apply()
     }
 
     private fun setupPhasen() {
-        currentPhaseIndex = getSharedPreferences("phasen", MODE_PRIVATE)
+        currentPhaseIndex = profilePrefs("phasen")
             .getInt("currentPhase", 0)
         applyPhase(currentPhaseIndex)
 
@@ -2440,7 +2785,7 @@ class MainActivity : AppCompatActivity() {
             if (currentPhaseIndex < geburtPhasen.lastIndex) {
                 currentPhaseIndex++
                 applyPhase(currentPhaseIndex)
-                getSharedPreferences("phasen", MODE_PRIVATE).edit()
+                profilePrefs("phasen").edit()
                     .putInt("currentPhase", currentPhaseIndex).apply()
             }
         }
@@ -2448,7 +2793,7 @@ class MainActivity : AppCompatActivity() {
             if (currentPhaseIndex > 0) {
                 currentPhaseIndex--
                 applyPhase(currentPhaseIndex)
-                getSharedPreferences("phasen", MODE_PRIVATE).edit()
+                profilePrefs("phasen").edit()
                     .putInt("currentPhase", currentPhaseIndex).apply()
             }
         }
@@ -2483,6 +2828,22 @@ class MainActivity : AppCompatActivity() {
 
     data class Task(val text: String, val done: Boolean)
     data class Contact(val name: String, val number: String, val editable: Boolean = false)
+    data class BirthProfile(val id: String, val name: String, val createdAt: Long)
+    data class Kind(
+        val id: Long,
+        var name: String = "",
+        var gewichtG: String = "",
+        var groesseCm: String = "",
+        var kopfumfangCm: String = "",
+        var apgar1: String = "",
+        var apgar5: String = "",
+        var apgar10: String = "",
+        var geburtsart: String = "",
+        var geburtsort: String = "",
+        var blutgruppe: String = "",
+        var geburtszeit: Long = 0L,
+        var notizen: String = ""
+    )
     data class BetreuungsEintrag(val id: Long, val name: String, val unbegrenzt: Boolean, val von: Long, val bis: Long, val phone: String = "")
     data class SearchSection(val title: String, val getContent: () -> String, val cardView: CardView)
     data class GeburtPhase(val emoji: String, val name: String, val hint: String, val visibleCards: (ActivityMainBinding) -> List<CardView>)
@@ -2535,7 +2896,7 @@ class MainActivity : AppCompatActivity() {
     // ── Contacts export / import ──────────────────────────────────────────────
 
     private fun exportContacts() {
-        val prefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val prefs = profilePrefs("contacts")
         val obj = JSONObject()
         EDITABLE_CONTACT_KEYS.forEach { key -> obj.put(key, prefs.getString(key, "") ?: "") }
         val json = obj.toString(2)
@@ -2551,7 +2912,7 @@ class MainActivity : AppCompatActivity() {
         try {
             val json = contentResolver.openInputStream(uri)?.bufferedReader()?.readText() ?: return
             val obj = JSONObject(json)
-            val prefs = getSharedPreferences("contacts", MODE_PRIVATE).edit()
+            val prefs = profilePrefs("contacts").edit()
             // Only accept known contact keys to prevent arbitrary data injection
             EDITABLE_CONTACT_KEYS.forEach { key ->
                 if (obj.has(key)) prefs.putString(key, obj.getString(key))
@@ -2714,7 +3075,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadAudioNotizen(): List<AudioNotiz> {
-        val prefs = getSharedPreferences("audio_notizen", MODE_PRIVATE)
+        val prefs = profilePrefs("audio_notizen")
         val json = prefs.getString("notizen", "[]") ?: "[]"
         return try {
             val array = JSONArray(json)
@@ -2770,7 +3131,7 @@ class MainActivity : AppCompatActivity() {
                 put("transcription", n.transcription)
             })
         }
-        getSharedPreferences("audio_notizen", MODE_PRIVATE)
+        profilePrefs("audio_notizen")
             .edit()
             .putString("notizen", array.toString())
             .apply()
@@ -3019,7 +3380,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Contacts
-        val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val contactPrefs = profilePrefs("contacts")
         val editableContacts = EDITABLE_CONTACT_KEYS.map { key ->
             Pair(key, contactPrefs.getString(key, "") ?: "")
         }
@@ -3080,66 +3441,66 @@ class MainActivity : AppCompatActivity() {
             val root = JSONObject()
 
             // Settings
-            val settingsPrefs = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+            val settingsPrefs = profilePrefs(PREFS_SETTINGS)
             val settingsObj = JSONObject()
             settingsPrefs.all.forEach { (k, v) -> settingsObj.put(k, v) }
             root.put("einstellungen", settingsObj)
 
             // Blasensprung
-            val bsPrefs = getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE)
+            val bsPrefs = profilePrefs(PREFS_BLASENSPRUNG)
             root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", blasensprungDefault))
 
             // Geburtszeit
-            val gzPrefs = getSharedPreferences("geburtszeit", MODE_PRIVATE)
+            val gzPrefs = profilePrefs("geburtszeit")
             root.put("geburtszeit_timestamp", gzPrefs.getLong("timestamp", 0L))
 
             // Milestones
-            val msPrefs = getSharedPreferences("milestones", MODE_PRIVATE)
+            val msPrefs = profilePrefs("milestones")
             root.put("einleitung_start", msPrefs.getLong("einleitung", 0L))
             root.put("wehen_unreg_start", msPrefs.getLong("wehen_unregelmaessig", 0L))
             root.put("wehen_reg_start", msPrefs.getLong("wehen_regelmaessig", 0L))
 
             // Phasen
-            val phasenPrefs = getSharedPreferences("phasen", MODE_PRIVATE)
+            val phasenPrefs = profilePrefs("phasen")
             root.put("current_phase", phasenPrefs.getInt("currentPhase", 0))
 
             // Custom timers
-            val ctPrefs = getSharedPreferences("custom_timers", MODE_PRIVATE)
+            val ctPrefs = profilePrefs("custom_timers")
             root.put("custom_timers", JSONArray(ctPrefs.getString("timers_json", "[]") ?: "[]"))
 
             // Medical items
-            val medPrefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+            val medPrefs = profilePrefs(PREFS_MEDICAL_LIST)
             root.put("medical_items", JSONArray(medPrefs.getString("items_json", "[]") ?: "[]"))
 
             // Notizen list
-            val notPrefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+            val notPrefs = profilePrefs(PREFS_NOTIZEN_LIST)
             root.put("notizen_items", JSONArray(notPrefs.getString("items_json", "[]") ?: "[]"))
 
             // Inline notes
-            val einleitungNotes = getSharedPreferences("einleitung_notizen", MODE_PRIVATE)
+            val einleitungNotes = profilePrefs("einleitung_notizen")
             root.put("einleitung_notizen", einleitungNotes.getString("text", "") ?: "")
-            val wehenUnregNotes = getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE)
+            val wehenUnregNotes = profilePrefs("wehen_unregelmaessig_notizen")
             root.put("wehen_unreg_notizen", wehenUnregNotes.getString("text", "") ?: "")
-            val wehenRegNotes = getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE)
+            val wehenRegNotes = profilePrefs("wehen_regelmaessig_notizen")
             root.put("wehen_reg_notizen", wehenRegNotes.getString("text", "") ?: "")
 
             // Checklist
-            val checkPrefs = getSharedPreferences("checklist", MODE_PRIVATE)
+            val checkPrefs = profilePrefs("checklist")
             root.put("checklist", JSONArray(checkPrefs.getString("tasks", "[]") ?: "[]"))
 
             // Contacts
-            val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+            val contactPrefs = profilePrefs("contacts")
             val contactObj = JSONObject()
             EDITABLE_CONTACT_KEYS.forEach { key -> contactObj.put(key, contactPrefs.getString(key, "") ?: "") }
             PRECONFIGURED_CONTACTS.forEach { (name, number) -> contactObj.put(name, number) }
             root.put("contacts", contactObj)
 
             // Betreuung
-            val betrPrefs = getSharedPreferences("betreuung", MODE_PRIVATE)
+            val betrPrefs = profilePrefs("betreuung")
             root.put("betreuung", JSONArray(betrPrefs.getString("eintraege", "[]") ?: "[]"))
 
             // Eckdaten
-            val eckPrefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+            val eckPrefs = profilePrefs("eckdaten")
             val eckObj = JSONObject()
             listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "apgar_1", "apgar_5", "apgar_10", "geburtsart", "geburtsort", "blutgruppe", "notizen")
                 .forEach { key -> eckObj.put(key, eckPrefs.getString(key, "") ?: "") }
@@ -3147,19 +3508,19 @@ class MainActivity : AppCompatActivity() {
 
             // Geburtswünsche
             root.put("geburtswuensche", JSONArray(
-                getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE).getString("items_json", "[]") ?: "[]"
+                profilePrefs(PREFS_GEBURTSWUENSCHE).getString("items_json", "[]") ?: "[]"
             ))
 
             // KinderInfo
-            val kinderPrefs = getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE)
+            val kinderPrefs = profilePrefs(PREFS_KINDER_INFO)
             root.put("kinder_info", kinderPrefs.getString("text", "") ?: "")
 
             // HospitalInfo
-            val hospitalPrefs = getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE)
+            val hospitalPrefs = profilePrefs(PREFS_HOSPITAL_INFO)
             root.put("hospital_info", hospitalPrefs.getString("text", "") ?: "")
 
             // Audio notizen metadata
-            val audioPrefs = getSharedPreferences("audio_notizen", MODE_PRIVATE)
+            val audioPrefs = profilePrefs("audio_notizen")
             root.put("audio_notizen", JSONArray(audioPrefs.getString("notizen", "[]") ?: "[]"))
 
             val json = root.toString(2)
@@ -3238,26 +3599,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildUrkundeText(): String {
-        val prefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
         val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
-
-        fun field(key: String, suffix: String = "") =
-            prefs.getString(key, "")?.trim()?.takeIf { it.isNotEmpty() }
-                ?.let { if (suffix.isEmpty()) it else "$it $suffix" } ?: "–"
-
-        val name = field("name")
-        val gewicht = field("gewicht_g", "g")
-        val groesse = field("groesse_cm", "cm")
-        val kopfumfang = field("kopfumfang_cm", "cm")
-        val apgar1 = field("apgar_1")
-        val apgar5 = field("apgar_5")
-        val apgar10 = field("apgar_10")
-        val geburtsart = field("geburtsart")
-        val geburtsort = field("geburtsort")
-        val blutgruppe = field("blutgruppe")
-        val notizen = prefs.getString("notizen", "")?.trim()
-
-        val geburtszeitStr = if (geburtszeit > 0L) sdf.format(Date(geburtszeit)) + " Uhr" else "–"
+        val kinderList = loadKinder()
 
         val lmpCal = dueDateCalendar.clone() as Calendar
         lmpCal.add(Calendar.DAY_OF_YEAR, -280)
@@ -3287,21 +3630,33 @@ class MainActivity : AppCompatActivity() {
             appendLine("       GEBURTSURKUNDE 2026")
             appendLine("   ══════════════════════════════")
             appendLine()
-            appendLine("👶  Name:            $name")
-            appendLine("📅  Geburtszeitpunkt: $geburtszeitStr")
-            appendLine("🏥  Geburtsort:       $geburtsort")
-            appendLine("🍼  Geburtsart:       $geburtsart")
-            appendLine()
-            appendLine("⚖️  Gewicht:          $gewicht")
-            appendLine("📏  Körperlänge:      $groesse")
-            appendLine("🔵  Kopfumfang:       $kopfumfang")
-            appendLine("🩸  Blutgruppe:       $blutgruppe")
-            appendLine()
-            appendLine("💗  APGAR-Werte:")
-            appendLine("      1 Minute:    $apgar1 / 10")
-            appendLine("      5 Minuten:   $apgar5 / 10")
-            appendLine("     10 Minuten:   $apgar10 / 10")
-            appendLine()
+            kinderList.forEachIndexed { idx, k ->
+                if (kinderList.size > 1) appendLine("─── Kind ${idx + 1} ───────────────────────")
+                appendLine("👶  Name:            ${k.name.ifEmpty { "–" }}")
+                val gzStr = if (k.geburtszeit > 0L) sdf.format(Date(k.geburtszeit)) + " Uhr" else "–"
+                appendLine("📅  Geburtszeitpunkt: $gzStr")
+                appendLine("🏥  Geburtsort:       ${k.geburtsort.ifEmpty { "–" }}")
+                appendLine("🍼  Geburtsart:       ${k.geburtsart.ifEmpty { "–" }}")
+                appendLine()
+                appendLine("⚖️  Gewicht:          ${k.gewichtG.takeIf { it.isNotEmpty() }?.let { "$it g" } ?: "–"}")
+                appendLine("📏  Körperlänge:      ${k.groesseCm.takeIf { it.isNotEmpty() }?.let { "$it cm" } ?: "–"}")
+                appendLine("🔵  Kopfumfang:       ${k.kopfumfangCm.takeIf { it.isNotEmpty() }?.let { "$it cm" } ?: "–"}")
+                appendLine("🩸  Blutgruppe:       ${k.blutgruppe.ifEmpty { "–" }}")
+                appendLine()
+                appendLine("💗  APGAR-Werte:")
+                appendLine("      1 Minute:    ${k.apgar1.ifEmpty { "–" }} / 10")
+                appendLine("      5 Minuten:   ${k.apgar5.ifEmpty { "–" }} / 10")
+                appendLine("     10 Minuten:   ${k.apgar10.ifEmpty { "–" }} / 10")
+                if (k.notizen.isNotEmpty()) {
+                    appendLine()
+                    appendLine("📝  Notizen: ${k.notizen}")
+                }
+                appendLine()
+            }
+            if (kinderList.isEmpty()) {
+                appendLine("👶  (Keine Kinder eingetragen)")
+                appendLine()
+            }
             appendLine("──────────────────────────────────")
             appendLine("🤰  Schwangerschaftswoche: $sswStr")
             appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
@@ -3327,12 +3682,6 @@ class MainActivity : AppCompatActivity() {
                 appendLine()
                 appendLine("🏥  Medizinische Hinweise:")
                 medicalItems.forEach { (_, t) -> appendLine("      • $t") }
-                appendLine()
-            }
-            if (!notizen.isNullOrEmpty()) {
-                appendLine()
-                appendLine("📝  Notizen:")
-                appendLine(notizen)
                 appendLine()
             }
             if (photoPaths.isNotEmpty()) {
@@ -3361,9 +3710,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 appendLine()
             }
-            val einleitungNotes = getSharedPreferences("einleitung_notizen", MODE_PRIVATE).getString("text", "") ?: ""
-            val wehenUnregNotes = getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: ""
-            val wehenRegNotes = getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: ""
+            val einleitungNotes = profilePrefs("einleitung_notizen").getString("text", "") ?: ""
+            val wehenUnregNotes = profilePrefs("wehen_unregelmaessig_notizen").getString("text", "") ?: ""
+            val wehenRegNotes = profilePrefs("wehen_regelmaessig_notizen").getString("text", "") ?: ""
             if (einleitungNotes.isNotEmpty()) { appendLine("=== Notizen zur Einleitung ==="); appendLine(einleitungNotes); appendLine() }
             if (wehenUnregNotes.isNotEmpty()) { appendLine("=== Notizen Wehen unregelmäßig ==="); appendLine(wehenUnregNotes); appendLine() }
             if (wehenRegNotes.isNotEmpty()) { appendLine("=== Notizen Wehen regelmäßig ==="); appendLine(wehenRegNotes); appendLine() }
@@ -3382,48 +3731,50 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildAllConfigJson(): String {
         val root = JSONObject()
-        val settingsPrefs = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+        val settingsPrefs = profilePrefs(PREFS_SETTINGS)
         val settingsObj = JSONObject()
         settingsPrefs.all.forEach { (k, v) -> settingsObj.put(k, v) }
         root.put("einstellungen", settingsObj)
-        val bsPrefs = getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE)
+        val bsPrefs = profilePrefs(PREFS_BLASENSPRUNG)
         root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", blasensprungDefault))
-        val gzPrefs = getSharedPreferences("geburtszeit", MODE_PRIVATE)
+        val gzPrefs = profilePrefs("geburtszeit")
         root.put("geburtszeit_timestamp", gzPrefs.getLong("timestamp", 0L))
-        val msPrefs = getSharedPreferences("milestones", MODE_PRIVATE)
+        val msPrefs = profilePrefs("milestones")
         root.put("einleitung_start", msPrefs.getLong("einleitung", 0L))
         root.put("wehen_unreg_start", msPrefs.getLong("wehen_unregelmaessig", 0L))
         root.put("wehen_reg_start", msPrefs.getLong("wehen_regelmaessig", 0L))
-        val phasenPrefs = getSharedPreferences("phasen", MODE_PRIVATE)
+        val phasenPrefs = profilePrefs("phasen")
         root.put("current_phase", phasenPrefs.getInt("currentPhase", 0))
-        val ctPrefs = getSharedPreferences("custom_timers", MODE_PRIVATE)
+        val ctPrefs = profilePrefs("custom_timers")
         root.put("custom_timers", JSONArray(ctPrefs.getString("timers_json", "[]") ?: "[]"))
-        val medPrefs = getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE)
+        val medPrefs = profilePrefs(PREFS_MEDICAL_LIST)
         root.put("medical_items", JSONArray(medPrefs.getString("items_json", "[]") ?: "[]"))
-        val notPrefs = getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE)
+        val notPrefs = profilePrefs(PREFS_NOTIZEN_LIST)
         root.put("notizen_items", JSONArray(notPrefs.getString("items_json", "[]") ?: "[]"))
-        root.put("einleitung_notizen", getSharedPreferences("einleitung_notizen", MODE_PRIVATE).getString("text", "") ?: "")
-        root.put("wehen_unreg_notizen", getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: "")
-        root.put("wehen_reg_notizen", getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE).getString("text", "") ?: "")
-        val checkPrefs = getSharedPreferences("checklist", MODE_PRIVATE)
+        root.put("einleitung_notizen", profilePrefs("einleitung_notizen").getString("text", "") ?: "")
+        root.put("wehen_unreg_notizen", profilePrefs("wehen_unregelmaessig_notizen").getString("text", "") ?: "")
+        root.put("wehen_reg_notizen", profilePrefs("wehen_regelmaessig_notizen").getString("text", "") ?: "")
+        val checkPrefs = profilePrefs("checklist")
         root.put("checklist", JSONArray(checkPrefs.getString("tasks", "[]") ?: "[]"))
-        val contactPrefs = getSharedPreferences("contacts", MODE_PRIVATE)
+        val contactPrefs = profilePrefs("contacts")
         val contactObj = JSONObject()
         EDITABLE_CONTACT_KEYS.forEach { key -> contactObj.put(key, contactPrefs.getString(key, "") ?: "") }
         PRECONFIGURED_CONTACTS.forEach { (name, number) -> contactObj.put(name, number) }
         root.put("contacts", contactObj)
-        val betrPrefs = getSharedPreferences("betreuung", MODE_PRIVATE)
+        val betrPrefs = profilePrefs("betreuung")
         root.put("betreuung", JSONArray(betrPrefs.getString("eintraege", "[]") ?: "[]"))
-        val eckPrefs = getSharedPreferences("eckdaten", MODE_PRIVATE)
+        val eckPrefs = profilePrefs("eckdaten")
         val eckObj = JSONObject()
         listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "apgar_1", "apgar_5", "apgar_10", "geburtsart", "geburtsort", "blutgruppe", "notizen")
             .forEach { key -> eckObj.put(key, eckPrefs.getString(key, "") ?: "") }
         root.put("eckdaten", eckObj)
-        root.put("geburtswuensche", JSONArray(getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE).getString("items_json", "[]") ?: "[]"))
-        root.put("kinder_info", getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE).getString("text", "") ?: "")
-        root.put("hospital_info", getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE).getString("text", "") ?: "")
-        val audioPrefs = getSharedPreferences("audio_notizen", MODE_PRIVATE)
+        root.put("geburtswuensche", JSONArray(profilePrefs(PREFS_GEBURTSWUENSCHE).getString("items_json", "[]") ?: "[]"))
+        root.put("kinder_info", profilePrefs(PREFS_KINDER_INFO).getString("text", "") ?: "")
+        root.put("hospital_info", profilePrefs(PREFS_HOSPITAL_INFO).getString("text", "") ?: "")
+        val audioPrefs = profilePrefs("audio_notizen")
         root.put("audio_notizen", JSONArray(audioPrefs.getString("notizen", "[]") ?: "[]"))
+        // Kinder
+        root.put("kinder", JSONArray(profilePrefs(PREFS_KINDER_LIST).getString("kinder_json", "[]") ?: "[]"))
         return root.toString(2)
     }
 
@@ -3439,7 +3790,7 @@ class MainActivity : AppCompatActivity() {
                     // Settings
                     if (root.has("einstellungen")) {
                         val s = root.getJSONObject("einstellungen")
-                        val sp = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE).edit()
+                        val sp = profilePrefs(PREFS_SETTINGS).edit()
                         if (s.has("due_date_millis")) sp.putLong("due_date_millis", s.getLong("due_date_millis"))
                         if (s.has("blasensprung_warn_orange_h")) sp.putInt("blasensprung_warn_orange_h", s.getInt("blasensprung_warn_orange_h"))
                         if (s.has("blasensprung_warn_red_h")) sp.putInt("blasensprung_warn_red_h", s.getInt("blasensprung_warn_red_h"))
@@ -3458,19 +3809,19 @@ class MainActivity : AppCompatActivity() {
                     // Blasensprung
                     if (root.has("blasensprung_timestamp")) {
                         val ts = root.getLong("blasensprung_timestamp")
-                        getSharedPreferences(PREFS_BLASENSPRUNG, MODE_PRIVATE).edit().putLong("timestamp", ts).apply()
+                        profilePrefs(PREFS_BLASENSPRUNG).edit().putLong("timestamp", ts).apply()
                         blasensprungTime = ts
                     }
 
                     // Geburtszeit
                     if (root.has("geburtszeit_timestamp")) {
                         val ts = root.getLong("geburtszeit_timestamp")
-                        getSharedPreferences("geburtszeit", MODE_PRIVATE).edit().putLong("timestamp", ts).apply()
+                        profilePrefs("geburtszeit").edit().putLong("timestamp", ts).apply()
                         geburtszeit = ts
                     }
 
                     // Milestones
-                    val msEditor = getSharedPreferences("milestones", MODE_PRIVATE).edit()
+                    val msEditor = profilePrefs("milestones").edit()
                     if (root.has("einleitung_start")) { val v = root.getLong("einleitung_start"); einleitungStartTime = v; msEditor.putLong("einleitung", v) }
                     if (root.has("wehen_unreg_start")) { val v = root.getLong("wehen_unreg_start"); wehenUnregelStartTime = v; msEditor.putLong("wehen_unregelmaessig", v) }
                     if (root.has("wehen_reg_start")) { val v = root.getLong("wehen_reg_start"); wehenRegelStartTime = v; msEditor.putLong("wehen_regelmaessig", v) }
@@ -3479,13 +3830,13 @@ class MainActivity : AppCompatActivity() {
                     // Phasen
                     if (root.has("current_phase")) {
                         val idx = root.getInt("current_phase")
-                        getSharedPreferences("phasen", MODE_PRIVATE).edit().putInt("currentPhase", idx).apply()
+                        profilePrefs("phasen").edit().putInt("currentPhase", idx).apply()
                         currentPhaseIndex = idx
                     }
 
                     // Custom timers
                     if (root.has("custom_timers")) {
-                        getSharedPreferences("custom_timers", MODE_PRIVATE).edit()
+                        profilePrefs("custom_timers").edit()
                             .putString("timers_json", root.getJSONArray("custom_timers").toString()).apply()
                         customTimers.clear()
                         loadCustomTimers()
@@ -3493,14 +3844,14 @@ class MainActivity : AppCompatActivity() {
 
                     // Medical items
                     if (root.has("medical_items")) {
-                        getSharedPreferences(PREFS_MEDICAL_LIST, MODE_PRIVATE).edit()
+                        profilePrefs(PREFS_MEDICAL_LIST).edit()
                             .putString("items_json", root.getJSONArray("medical_items").toString()).apply()
                         loadMedicalItemsIntoMemory()
                     }
 
                     // Notizen list
                     if (root.has("notizen_items")) {
-                        getSharedPreferences(PREFS_NOTIZEN_LIST, MODE_PRIVATE).edit()
+                        profilePrefs(PREFS_NOTIZEN_LIST).edit()
                             .putString("items_json", root.getJSONArray("notizen_items").toString()).apply()
                         loadNotizenItemsIntoMemory()
                     }
@@ -3508,23 +3859,23 @@ class MainActivity : AppCompatActivity() {
                     // Inline notes
                     if (root.has("einleitung_notizen")) {
                         val t = root.getString("einleitung_notizen")
-                        getSharedPreferences("einleitung_notizen", MODE_PRIVATE).edit().putString("text", t).apply()
+                        profilePrefs("einleitung_notizen").edit().putString("text", t).apply()
                         binding.etEinleitungNotizen.setText(t)
                     }
                     if (root.has("wehen_unreg_notizen")) {
                         val t = root.getString("wehen_unreg_notizen")
-                        getSharedPreferences("wehen_unregelmaessig_notizen", MODE_PRIVATE).edit().putString("text", t).apply()
+                        profilePrefs("wehen_unregelmaessig_notizen").edit().putString("text", t).apply()
                         binding.etWehenUnregelNotizen.setText(t)
                     }
                     if (root.has("wehen_reg_notizen")) {
                         val t = root.getString("wehen_reg_notizen")
-                        getSharedPreferences("wehen_regelmaessig_notizen", MODE_PRIVATE).edit().putString("text", t).apply()
+                        profilePrefs("wehen_regelmaessig_notizen").edit().putString("text", t).apply()
                         binding.etWehenRegelNotizen.setText(t)
                     }
 
                     // Checklist
                     if (root.has("checklist")) {
-                        getSharedPreferences("checklist", MODE_PRIVATE).edit()
+                        profilePrefs("checklist").edit()
                             .putString("tasks", root.getJSONArray("checklist").toString()).apply()
                         tasks.clear()
                         tasks.addAll(loadTasks())
@@ -3533,7 +3884,7 @@ class MainActivity : AppCompatActivity() {
                     // Contacts
                     if (root.has("contacts")) {
                         val contactObj = root.getJSONObject("contacts")
-                        val sp = getSharedPreferences("contacts", MODE_PRIVATE).edit()
+                        val sp = profilePrefs("contacts").edit()
                         EDITABLE_CONTACT_KEYS.forEach { key ->
                             if (contactObj.has(key)) sp.putString(key, contactObj.getString(key))
                         }
@@ -3542,14 +3893,14 @@ class MainActivity : AppCompatActivity() {
 
                     // Betreuung
                     if (root.has("betreuung")) {
-                        getSharedPreferences("betreuung", MODE_PRIVATE).edit()
+                        profilePrefs("betreuung").edit()
                             .putString("eintraege", root.getJSONArray("betreuung").toString()).apply()
                     }
 
                     // Eckdaten
                     if (root.has("eckdaten")) {
                         val eckObj = root.getJSONObject("eckdaten")
-                        val sp = getSharedPreferences("eckdaten", MODE_PRIVATE).edit()
+                        val sp = profilePrefs("eckdaten").edit()
                         listOf("name", "gewicht_g", "groesse_cm", "kopfumfang_cm", "apgar_1", "apgar_5", "apgar_10", "geburtsart", "geburtsort", "blutgruppe", "notizen")
                             .forEach { key -> if (eckObj.has(key)) sp.putString(key, eckObj.getString(key)) }
                         sp.apply()
@@ -3557,7 +3908,7 @@ class MainActivity : AppCompatActivity() {
 
                     // Geburtswünsche
                     if (root.has("geburtswuensche")) {
-                        getSharedPreferences(PREFS_GEBURTSWUENSCHE, MODE_PRIVATE).edit()
+                        profilePrefs(PREFS_GEBURTSWUENSCHE).edit()
                             .putString("items_json", root.getJSONArray("geburtswuensche").toString()).apply()
                         geburtswuensche.clear()
                         geburtswuensche.addAll(loadGeburtswuensceListe())
@@ -3565,20 +3916,26 @@ class MainActivity : AppCompatActivity() {
 
                     // KinderInfo
                     if (root.has("kinder_info")) {
-                        getSharedPreferences(PREFS_KINDER_INFO, MODE_PRIVATE).edit()
+                        profilePrefs(PREFS_KINDER_INFO).edit()
                             .putString("text", root.getString("kinder_info")).apply()
                     }
 
                     // HospitalInfo
                     if (root.has("hospital_info")) {
-                        getSharedPreferences(PREFS_HOSPITAL_INFO, MODE_PRIVATE).edit()
+                        profilePrefs(PREFS_HOSPITAL_INFO).edit()
                             .putString("text", root.getString("hospital_info")).apply()
                     }
 
                     // Audio notizen metadata
                     if (root.has("audio_notizen")) {
-                        getSharedPreferences("audio_notizen", MODE_PRIVATE).edit()
+                        profilePrefs("audio_notizen").edit()
                             .putString("notizen", root.getJSONArray("audio_notizen").toString()).apply()
+                    }
+
+                    // Kinder
+                    if (root.has("kinder")) {
+                        profilePrefs(PREFS_KINDER_LIST).edit()
+                            .putString("kinder_json", root.getJSONArray("kinder").toString()).apply()
                     }
 
                     // Refresh all UI
@@ -3668,7 +4025,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadTrackerEntries() {
-        val prefs = getSharedPreferences("baby_tracker", MODE_PRIVATE)
+        val prefs = profilePrefs("baby_tracker")
         val json = prefs.getString("entries", "[]") ?: "[]"
         trackerEntries.clear()
         try {
@@ -3692,7 +4049,7 @@ class MainActivity : AppCompatActivity() {
                 if (e.value != null) put("value", e.value)
             })
         }
-        getSharedPreferences("baby_tracker", MODE_PRIVATE)
+        profilePrefs("baby_tracker")
             .edit().putString("entries", arr.toString()).apply()
     }
 
@@ -3879,5 +4236,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_KINDER_INFO = "kinder_info"
         private const val PREFS_HOSPITAL_INFO = "hospital_info"
         private const val PREFS_GEBURTSWUENSCHE = "geburtswuensche"
+        private const val PREFS_PROFILES_GLOBAL = "geburt2026_profiles"
+        private const val PREFS_KINDER_LIST = "kinder_list"
     }
 }

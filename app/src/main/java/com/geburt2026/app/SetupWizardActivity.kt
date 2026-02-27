@@ -283,6 +283,24 @@ class SetupWizardActivity : AppCompatActivity() {
         // Persist the last step's data
         saveCurrentStep()
 
+        // Ensure a default profile exists in the profiles list
+        val profilesPrefs = getSharedPreferences("geburt2026_profiles", MODE_PRIVATE)
+        if (!profilesPrefs.contains("profiles_json")) {
+            val profileName = getSharedPreferences("einstellungen", MODE_PRIVATE)
+                .getString("profile_name", null)
+                ?: run {
+                    val sdf = java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.GERMAN)
+                    "Geburt ${sdf.format(java.util.Date())}"
+                }
+            val arr = org.json.JSONArray()
+            arr.put(org.json.JSONObject().apply {
+                put("id", "")
+                put("name", profileName)
+                put("createdAt", System.currentTimeMillis())
+            })
+            profilesPrefs.edit().putString("profiles_json", arr.toString()).apply()
+        }
+
         // Mark wizard as completed
         getSharedPreferences("wizard", MODE_PRIVATE).edit()
             .putBoolean("wizard_completed", true)
