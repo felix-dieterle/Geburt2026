@@ -145,12 +145,8 @@ class MainActivity : AppCompatActivity() {
         renderAudioNotizen()
     }
 
-    // Blasensprung: 22.02.2026 um 6:15 Uhr (editable, persisted)
-    private val blasensprungDefault: Long = Calendar.getInstance().apply {
-        set(2026, Calendar.FEBRUARY, 22, 6, 15, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
-    private var blasensprungTime: Long = blasensprungDefault
+    // Blasensprung: persisted per profile, 0L means not yet set
+    private var blasensprungTime: Long = 0L
 
     // Errechneter Geburtstermin – loaded from settings, default 08.03.2026
     private val dueDateCalendar: Calendar = Calendar.getInstance().apply {
@@ -350,6 +346,11 @@ class MainActivity : AppCompatActivity() {
         )
 
     private fun updateBirthTimer() {
+        if (blasensprungTime == 0L) {
+            binding.tvElapsedTime.text = "--:--:--"
+            binding.tvTimerWarning.visibility = View.GONE
+            return
+        }
         val now = System.currentTimeMillis()
         val elapsed = now - blasensprungTime
         if (elapsed < 0) return
@@ -514,27 +515,31 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupBirthInfo() {
         val blasensprungPrefs = profilePrefs(PREFS_BLASENSPRUNG)
-        blasensprungTime = blasensprungPrefs.getLong("timestamp", blasensprungDefault)
+        blasensprungTime = blasensprungPrefs.getLong("timestamp", 0L)
 
         val sdfDateTime = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
         val sdfDate = SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN)
-        binding.tvBlasensprungTime.text = sdfDateTime.format(Date(blasensprungTime))
+        binding.tvBlasensprungTime.text = if (blasensprungTime > 0L) sdfDateTime.format(Date(blasensprungTime)) else "–"
         binding.tvDueDate.text = sdfDate.format(dueDateCalendar.time)
 
-        // Schwangerschaftswoche berechnen (ET 08.03.2026 → SSW rückrechnen)
-        // Naegele: ET = LMP + 280 Tage → LMP = ET - 280
-        val lmpCal = dueDateCalendar.clone() as Calendar
-        lmpCal.add(Calendar.DAY_OF_YEAR, -280)
-        val weeksDiff = TimeUnit.MILLISECONDS.toDays(
-            blasensprungTime - lmpCal.timeInMillis
-        ) / 7
-        val daysDiff = TimeUnit.MILLISECONDS.toDays(
-            blasensprungTime - lmpCal.timeInMillis
-        ) % 7
-        binding.tvSsw.text = "SSW ${weeksDiff}+${daysDiff} (Frühgeburt)"
+        // Schwangerschaftswoche berechnen – nur wenn Blasensprung-Zeit gesetzt
+        if (blasensprungTime > 0L) {
+            // Naegele: ET = LMP + 280 Tage → LMP = ET - 280
+            val lmpCal = dueDateCalendar.clone() as Calendar
+            lmpCal.add(Calendar.DAY_OF_YEAR, -280)
+            val weeksDiff = TimeUnit.MILLISECONDS.toDays(
+                blasensprungTime - lmpCal.timeInMillis
+            ) / 7
+            val daysDiff = TimeUnit.MILLISECONDS.toDays(
+                blasensprungTime - lmpCal.timeInMillis
+            ) % 7
+            binding.tvSsw.text = "SSW ${weeksDiff}+${daysDiff} (Frühgeburt)"
+        } else {
+            binding.tvSsw.text = "–"
+        }
 
         binding.tvBlasensprungTime.setOnClickListener {
-            val initial = Calendar.getInstance().apply { timeInMillis = blasensprungTime }
+            val initial = if (blasensprungTime > 0L) Calendar.getInstance().apply { timeInMillis = blasensprungTime } else Calendar.getInstance()
             showDateTimePicker(initial) { cal ->
                 blasensprungTime = cal.timeInMillis
                 blasensprungPrefs.edit().putLong("timestamp", blasensprungTime).apply()
@@ -1512,18 +1517,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupKinderInfo() {
         val prefs = profilePrefs(PREFS_KINDER_INFO)
-        val defaultText = buildString {
-            appendLine("👦 Kind 1: 7 Jahre")
-            appendLine("👧 Kind 2: 4 Jahre")
-            appendLine("📍 Aktuell: Oma & Opa in Sipplinen")
-            appendLine("🚗 Opa kann NICHT Auto fahren")
-            appendLine("⚠️ Transport organisieren!")
-            appendLine("")
-            appendLine("Mögliche Lösungen:")
-            appendLine("• Taxi / Uber für Oma+Kinder")
-            appendLine("• Freunde/Nachbarn fragen")
-            append("• ÖPNV: Sipplinen – Singen prüfen")
-        }
+        val defaultText = ""
         val text = prefs.getString("text", defaultText) ?: defaultText
         binding.tvKinderStatus.text = text
 
@@ -1578,9 +1572,6 @@ class MainActivity : AppCompatActivity() {
             appendLine("   📞 Kreissaal: 07531 801-2830")
             appendLine("")
             appendLine("📞 Notruf: 112")
-            appendLine("")
-            appendLine("👨‍⚕️ Vater ist im Krankenhaus dabei")
-            append("📅 Blasensprung: 22.02.2026, 06:15 Uhr")
         }
         val text = prefs.getString("text", defaultText) ?: defaultText
         binding.tvHospitalInfo.text = text
@@ -2268,7 +2259,7 @@ class MainActivity : AppCompatActivity() {
         val sswStr = if (totalDays >= 0) "SSW ${totalDays / 7}+${totalDays % 7}" else "–"
 
         // Duration from Blasensprung to birth
-        val blasensprungBisGeburtStr = if (geburtszeit > 0L) {
+        val blasensprungBisGeburtStr = if (geburtszeit > 0L && blasensprungTime > 0L) {
             val ms = geburtszeit - blasensprungTime
             if (ms >= 0) {
                 val h = TimeUnit.MILLISECONDS.toHours(ms)
@@ -2320,8 +2311,8 @@ class MainActivity : AppCompatActivity() {
             }
             appendLine("──────────────────────────────────")
             appendLine("🤰  Schwangerschaftswoche: $sswStr")
-            appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
-            if (geburtszeit > 0L) {
+            appendLine("💧  Blasensprung: ${if (blasensprungTime > 0L) sdf.format(Date(blasensprungTime)) + " Uhr" else "–"}")
+            if (geburtszeit > 0L && blasensprungTime > 0L) {
                 appendLine("⏱️  Blasensprung → Geburt: $blasensprungBisGeburtStr")
             }
             appendLine()
@@ -3424,10 +3415,14 @@ class MainActivity : AppCompatActivity() {
                 // Refresh due date and SSW display
                 val sdfD = SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN)
                 binding.tvDueDate.text = sdfD.format(dueDateCalendar.time)
-                val lmpCal = dueDateCalendar.clone() as Calendar
-                lmpCal.add(Calendar.DAY_OF_YEAR, -280)
-                val totalDaysFromLmp = TimeUnit.MILLISECONDS.toDays(blasensprungTime - lmpCal.timeInMillis)
-                binding.tvSsw.text = "SSW ${totalDaysFromLmp / 7}+${totalDaysFromLmp % 7}"
+                if (blasensprungTime > 0L) {
+                    val lmpCal = dueDateCalendar.clone() as Calendar
+                    lmpCal.add(Calendar.DAY_OF_YEAR, -280)
+                    val totalDaysFromLmp = TimeUnit.MILLISECONDS.toDays(blasensprungTime - lmpCal.timeInMillis)
+                    binding.tvSsw.text = "SSW ${totalDaysFromLmp / 7}+${totalDaysFromLmp % 7}"
+                } else {
+                    binding.tvSsw.text = "–"
+                }
                 Toast.makeText(this, "Einstellungen gespeichert ✓", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Abbrechen", null)
@@ -3448,7 +3443,7 @@ class MainActivity : AppCompatActivity() {
 
             // Blasensprung
             val bsPrefs = profilePrefs(PREFS_BLASENSPRUNG)
-            root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", blasensprungDefault))
+            root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", 0L))
 
             // Geburtszeit
             val gzPrefs = profilePrefs("geburtszeit")
@@ -3608,7 +3603,7 @@ class MainActivity : AppCompatActivity() {
         val totalDays = TimeUnit.MILLISECONDS.toDays(refTime - lmpCal.timeInMillis)
         val sswStr = if (totalDays >= 0) "SSW ${totalDays / 7}+${totalDays % 7}" else "–"
 
-        val blasensprungBisGeburtStr = if (geburtszeit > 0L) {
+        val blasensprungBisGeburtStr = if (geburtszeit > 0L && blasensprungTime > 0L) {
             val ms = geburtszeit - blasensprungTime
             if (ms >= 0) {
                 val h = TimeUnit.MILLISECONDS.toHours(ms)
@@ -3659,8 +3654,8 @@ class MainActivity : AppCompatActivity() {
             }
             appendLine("──────────────────────────────────")
             appendLine("🤰  Schwangerschaftswoche: $sswStr")
-            appendLine("💧  Blasensprung: ${sdf.format(Date(blasensprungTime))} Uhr")
-            if (geburtszeit > 0L) {
+            appendLine("💧  Blasensprung: ${if (blasensprungTime > 0L) sdf.format(Date(blasensprungTime)) + " Uhr" else "–"}")
+            if (geburtszeit > 0L && blasensprungTime > 0L) {
                 appendLine("⏱️  Blasensprung → Geburt: $blasensprungBisGeburtStr")
             }
             appendLine()
@@ -3736,7 +3731,7 @@ class MainActivity : AppCompatActivity() {
         settingsPrefs.all.forEach { (k, v) -> settingsObj.put(k, v) }
         root.put("einstellungen", settingsObj)
         val bsPrefs = profilePrefs(PREFS_BLASENSPRUNG)
-        root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", blasensprungDefault))
+        root.put("blasensprung_timestamp", bsPrefs.getLong("timestamp", 0L))
         val gzPrefs = profilePrefs("geburtszeit")
         root.put("geburtszeit_timestamp", gzPrefs.getLong("timestamp", 0L))
         val msPrefs = profilePrefs("milestones")
