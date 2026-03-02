@@ -4064,6 +4064,67 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun showWeightDetailsDialog() {
+        val weightEntries = trackerEntries.filter { it.category == "gewicht" && it.value != null }
+            .sortedByDescending { it.timestamp }
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 16, 48, 8)
+        }
+
+        if (weightEntries.isEmpty()) {
+            container.addView(TextView(this).apply {
+                text = "Noch keine Gewichtseinträge."
+                textSize = 14f
+            })
+        } else {
+            weightEntries.forEach { entry ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    setPadding(0, 6, 0, 6)
+                }
+                val tv = TextView(this).apply {
+                    text = "⚖️ ${entry.value?.toInt() ?: 0} g  –  ${sdf.format(Date(entry.timestamp))}"
+                    textSize = 14f
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                val btnDel = android.widget.Button(this).apply {
+                    text = "✕"
+                    textSize = 11f
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(getColor(R.color.warning_red))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).also { it.setMargins(8, 0, 0, 0) }
+                    setPadding(12, 0, 12, 0)
+                }
+                row.addView(tv)
+                row.addView(btnDel)
+                container.addView(row)
+
+                btnDel.setOnClickListener {
+                    trackerEntries.removeAll { it.id == entry.id }
+                    saveTrackerEntries()
+                    renderTracker()
+                    container.removeView(row)
+                }
+            }
+        }
+
+        val scrollView = android.widget.ScrollView(this).apply {
+            addView(container)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("⚖️ Gewichtseinträge")
+            .setView(scrollView)
+            .setPositiveButton("Schließen", null)
+            .show()
+    }
+
     private fun loadTrackerEntries() {
         val prefs = profilePrefs("baby_tracker")
         val json = prefs.getString("entries", "[]") ?: "[]"
@@ -4145,7 +4206,7 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        // Weight summary
+        // Weight chart section
         val weightEntries = trackerEntries.filter { it.category == "gewicht" && it.value != null }
             .sortedByDescending { it.timestamp }
         if (weightEntries.isNotEmpty()) {
@@ -4167,11 +4228,16 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(getColor(R.color.text_primary))
                 setPadding(0, 4, 0, 4)
             })
+            binding.llWeightChart.visibility = android.view.View.VISIBLE
+            binding.weightChartView.setData(weightEntries.mapNotNull { e -> e.value?.let { v -> Pair(e.timestamp, v) } })
+            binding.btnWeightDetails.setOnClickListener { showWeightDetailsDialog() }
+        } else {
+            binding.llWeightChart.visibility = android.view.View.GONE
         }
 
         val recentLayout = binding.llTrackerEntries
         recentLayout.removeAllViews()
-        val recent = trackerEntries.sortedByDescending { it.timestamp }.take(20)
+        val recent = trackerEntries.filter { it.category != "gewicht" }.sortedByDescending { it.timestamp }.take(20)
         if (recent.isEmpty()) {
             recentLayout.addView(TextView(this).apply {
                 text = "Noch keine Einträge"
