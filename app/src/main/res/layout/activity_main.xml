@@ -1347,6 +1347,15 @@
                     android:textSize="13sp"
                     android:backgroundTint="@color/primary_dark" />
 
+                <Button
+                    android:id="@+id/btnFotobuchBestellen"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="📔 Fotobuch bestellen"
+                    android:textSize="13sp"
+                    android:backgroundTint="@color/success_green" />
+
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 

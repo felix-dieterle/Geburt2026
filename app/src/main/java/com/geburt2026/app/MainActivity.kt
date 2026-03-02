@@ -2099,6 +2099,51 @@ class MainActivity : AppCompatActivity() {
             pickPhotoLauncher.launch("image/*")
         }
         binding.btnExportPhotos.setOnClickListener { exportPhotos() }
+        binding.btnFotobuchBestellen.setOnClickListener { showFotobuchDialog() }
+    }
+
+    private fun showFotobuchDialog() {
+        val photoCount = photoPaths.size
+        val recommendation = when {
+            photoCount == 0 -> "Füge zuerst Fotos hinzu, um ein Fotobuch zu erstellen."
+            photoCount < 10 -> "Du hast $photoCount Foto${if (photoCount == 1) "" else "s"} – ein kleines Mini-Fotobuch (bis 20 Seiten) wäre ideal!"
+            photoCount < 30 -> "Du hast $photoCount Fotos – ein klassisches Fotobuch (20–40 Seiten) wäre perfekt!"
+            else -> "Du hast $photoCount Fotos – ein großes Fotobuch (40+ Seiten) oder eine Fotobox bietet sich an!"
+        }
+
+        val message = "$recommendation\n\nWähle einen Anbieter – du wirst direkt zur Bestellseite weitergeleitet. Die App erhält eine kleine Provision, die die Weiterentwicklung unterstützt."
+
+        val builder = AlertDialog.Builder(this)
+            .setTitle("📔 Fotobuch bestellen")
+            .setMessage(message)
+
+        if (photoCount > 0) {
+            builder
+                .setPositiveButton("CEWE Fotobuch") { _, _ ->
+                    openUrl(FOTOBUCH_URL_CEWE)
+                }
+                .setNeutralButton("Pixum") { _, _ ->
+                    openUrl(FOTOBUCH_URL_PIXUM)
+                }
+                .setNegativeButton("Abbrechen", null)
+        } else {
+            builder.setNegativeButton("OK", null)
+        }
+
+        builder.show()
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            val uri = Uri.parse(url)
+            if (uri.scheme != "http" && uri.scheme != "https") {
+                Toast.makeText(this, "Ungültige URL", Toast.LENGTH_SHORT).show()
+                return
+            }
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (e: Exception) {
+            Toast.makeText(this, "Browser konnte nicht geöffnet werden", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun exportPhotos() {
@@ -4215,6 +4260,11 @@ class MainActivity : AppCompatActivity() {
 
         private const val WEHEN_REG_WARN_ORANGE_H_DEFAULT = 4
         private const val WEHEN_REG_WARN_RED_H_DEFAULT = 8
+
+        private const val FOTOBUCH_URL_CEWE =
+            "https://www.cewe.de/fotobuch.html?wt_mc=de.aff.geburt2026.app"
+        private const val FOTOBUCH_URL_PIXUM =
+            "https://www.pixum.de/fotobuecher?utm_source=geburt2026&utm_medium=app&utm_campaign=fotobuch"
 
         private const val DEFAULT_HOSPITAL_CALL_PHONE = "0753180100"
         private const val DEFAULT_OPNV_URL =
