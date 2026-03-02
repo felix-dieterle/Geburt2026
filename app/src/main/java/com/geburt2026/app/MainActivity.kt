@@ -2111,7 +2111,7 @@ class MainActivity : AppCompatActivity() {
             else -> "Du hast $photoCount Fotos – ein großes Fotobuch (40+ Seiten) oder eine Fotobox bietet sich an!"
         }
 
-        val message = "$recommendation\n\nWähle einen Anbieter – du wirst direkt zur Bestellseite weitergeleitet. Die App erhält eine kleine Provision, die die Weiterentwicklung unterstützt."
+        val message = "$recommendation\n\nWähle einen Anbieter – du wirst direkt zur Bestellseite weitergeleitet."
 
         val builder = AlertDialog.Builder(this)
             .setTitle("📔 Fotobuch bestellen")
@@ -4328,9 +4328,9 @@ class MainActivity : AppCompatActivity() {
         private const val WEHEN_REG_WARN_RED_H_DEFAULT = 8
 
         private const val FOTOBUCH_URL_CEWE =
-            "https://www.cewe.de/fotobuch.html?wt_mc=de.aff.geburt2026.app"
+            "https://www.cewe.de/fotobuch.html"
         private const val FOTOBUCH_URL_PIXUM =
-            "https://www.pixum.de/fotobuecher?utm_source=geburt2026&utm_medium=app&utm_campaign=fotobuch"
+            "https://www.pixum.de/fotobuecher"
 
         private const val DEFAULT_HOSPITAL_CALL_PHONE = "0753180100"
         private const val DEFAULT_OPNV_URL =
