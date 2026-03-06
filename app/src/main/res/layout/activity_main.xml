@@ -1484,7 +1484,7 @@
                     <com.geburt2026.app.WeightChartView
                         android:id="@+id/weightChartView"
                         android:layout_width="match_parent"
-                        android:layout_height="160dp"
+                        android:layout_height="200dp"
                         android:layout_marginBottom="8dp" />
 
                 </LinearLayout>
