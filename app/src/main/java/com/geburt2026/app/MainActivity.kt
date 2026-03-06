@@ -4230,6 +4230,10 @@ class MainActivity : AppCompatActivity() {
             })
             binding.llWeightChart.visibility = android.view.View.VISIBLE
             binding.weightChartView.setData(weightEntries.mapNotNull { e -> e.value?.let { v -> Pair(e.timestamp, v) } })
+            val primaryKind = kinder.firstOrNull()
+            val birthWeightG = primaryKind?.gewichtG?.toDoubleOrNull() ?: 0.0
+            val birthTs = primaryKind?.geburtszeit ?: 0L
+            binding.weightChartView.setBirthData(birthWeightG, birthTs)
             binding.btnWeightDetails.setOnClickListener { showWeightDetailsDialog() }
         } else {
             binding.llWeightChart.visibility = android.view.View.GONE
