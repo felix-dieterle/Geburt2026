@@ -1472,6 +1472,16 @@
                             android:textColor="@color/primary_dark" />
 
                         <Button
+                            android:id="@+id/btnWeightChartInfo"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ℹ️"
+                            android:textSize="16sp"
+                            android:layout_marginEnd="4dp"
+                            android:contentDescription="Gewichtskurve erklären"
+                            style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                        <Button
                             android:id="@+id/btnWeightDetails"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"

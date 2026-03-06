@@ -4064,6 +4064,32 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun showWeightChartInfoDialog() {
+        val message = """
+            📈 So liest du die Gewichtskurve:
+
+            🔵 Blaue Linie
+            Deine tatsächlich eingetragenen Gewichtsmessungen.
+
+            🟢 Grüne gestrichelte Linie – „Empfehlung"
+            Empfohlene Gewichtsentwicklung nach medizinischen Leitlinien:
+            • Tage 0–5: Normaler Gewichtsabfall bis ca. −7 %
+            • Tage 5–14: Erholung zurück auf das Geburtsgewicht
+            • Ab Tag 14: Zunahme von ca. 25 g/Tag
+
+            🔴 Rote gestrichelte Linie – „Kritisch −10 %"
+            Diese Linie markiert 90 % des Geburtsgewichts. Ein Gewichtsverlust von mehr als 10 % gilt als medizinische Warngrenze und sollte ärztlich abgeklärt werden, da er auf unzureichende Nahrungsaufnahme oder Dehydration hinweisen kann.
+
+            ℹ️ Die Empfehlungswerte dienen als Orientierung. Individuelle Abweichungen sind normal – bitte immer Rücksprache mit der Hebamme oder dem Kinderarzt halten.
+        """.trimIndent()
+
+        AlertDialog.Builder(this)
+            .setTitle("Gewichtskurve – Erklärung")
+            .setMessage(message)
+            .setPositiveButton("Verstanden", null)
+            .show()
+    }
+
     private fun showWeightDetailsDialog() {
         val weightEntries = trackerEntries.filter { it.category == "gewicht" && it.value != null }
             .sortedByDescending { it.timestamp }
@@ -4246,6 +4272,7 @@ class MainActivity : AppCompatActivity() {
             val birthTs = primaryKind?.geburtszeit ?: 0L
             binding.weightChartView.setBirthData(birthWeightG, birthTs)
             binding.btnWeightDetails.setOnClickListener { showWeightDetailsDialog() }
+            binding.btnWeightChartInfo.setOnClickListener { showWeightChartInfoDialog() }
         } else {
             binding.llWeightChart.visibility = android.view.View.GONE
         }
