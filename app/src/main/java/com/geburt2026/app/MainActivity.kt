@@ -4080,14 +4080,25 @@ class MainActivity : AppCompatActivity() {
                 textSize = 14f
             })
         } else {
-            weightEntries.forEach { entry ->
+            weightEntries.forEachIndexed { index, entry ->
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = android.view.Gravity.CENTER_VERTICAL
                     setPadding(0, 6, 0, 6)
                 }
+                val prev = if (index + 1 < weightEntries.size) weightEntries[index + 1] else null
+                val deltaStr = if (prev != null && prev.value != null && entry.value != null) {
+                    val diff = entry.value - prev.value
+                    when {
+                        diff > 0 -> "  ↑ +${diff.toInt()} g"
+                        diff < 0 -> "  ↓ ${diff.toInt()} g"
+                        else -> "  → ±0 g"
+                    }
+                } else ""
+                val isFirst = index == weightEntries.size - 1
+                val firstLabel = if (isFirst) "  (erster Eintrag)" else ""
                 val tv = TextView(this).apply {
-                    text = "⚖️ ${entry.value?.toInt() ?: 0} g  –  ${sdf.format(Date(entry.timestamp))}"
+                    text = "⚖️ ${entry.value?.toInt() ?: 0} g  –  ${sdf.format(Date(entry.timestamp))}$deltaStr$firstLabel"
                     textSize = 14f
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 }
