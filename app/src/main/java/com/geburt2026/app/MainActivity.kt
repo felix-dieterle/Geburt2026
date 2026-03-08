@@ -229,10 +229,10 @@ class MainActivity : AppCompatActivity() {
                 listOf(b.cardTimer, b.cardMedical, b.cardWishes, b.cardHospital, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
             },
             GeburtPhase("🍼", "Nachgeburtsphase", "Hep-B-Impfung, erste Stunden, Nachgeburt") { b ->
-                listOf(b.cardTracker, b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten)
+                listOf(b.cardTracker, b.cardMedical, b.cardChecklist, b.cardContacts, b.cardAudioNotizen, b.cardEckdaten, b.cardDevelopment)
             },
             GeburtPhase("🏠", "Erste Tage Zuhause", "Ankommen – Wochenbett & Familie") { b ->
-                listOf(b.cardTracker, b.cardEckdaten, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardNotes, b.cardAudioNotizen)
+                listOf(b.cardTracker, b.cardEckdaten, b.cardDevelopment, b.cardKids, b.cardBetreuung, b.cardChecklist, b.cardContacts, b.cardNotes, b.cardAudioNotizen)
             },
         )
     }
@@ -279,6 +279,7 @@ class MainActivity : AppCompatActivity() {
         setupSearch()
         setupAudioNotizen()
         setupTracker()
+        setupDevelopmentMilestones()
         setupPhasen()
         setupEinstellungen()
     }
@@ -2812,6 +2813,188 @@ class MainActivity : AppCompatActivity() {
             .apply()
     }
 
+    // ── Development Milestones ─────────────────────────────────────────────────
+
+    private data class DevelopmentMilestone(
+        val fromDays: Int,
+        val toDays: Int,
+        val title: String,
+        val items: List<String>
+    )
+
+    private val developmentMilestones: List<DevelopmentMilestone> = listOf(
+        DevelopmentMilestone(0, 7, "Woche 1 (0–7 Tage)", listOf(
+            "👁️ Sieht verschwommene Umrisse bis ca. 20–30 cm – genau der Abstand zum Gesicht beim Stillen",
+            "👂 Erkennt vertraute Stimmen aus der Schwangerschaft (Mama, Papa)",
+            "🤲 Greifreflex aktiv: umklammert automatisch einen Finger",
+            "😴 Schläft ca. 16–18 Stunden täglich in kurzen Zyklen",
+            "👅 Suchreflex und Saugreflex voll ausgebildet"
+        )),
+        DevelopmentMilestone(7, 14, "Woche 2 (7–14 Tage)", listOf(
+            "👁️ Fokussiert Gesichter aus kurzer Distanz klarer",
+            "👂 Dreht Kopf in Richtung von Geräuschen",
+            "😊 Erstes reflexartiges Lächeln möglich",
+            "🤲 Hält Fäuste oft geballt, Beinbewegungen lebhafter",
+            "🍼 Gewicht beginnt nach anfänglichem Verlust wieder zuzunehmen"
+        )),
+        DevelopmentMilestone(14, 28, "Woche 2–4 (14–28 Tage)", listOf(
+            "👁️ Verfolgt langsame Bewegungen kurz mit den Augen (visuelles Tracking)",
+            "👂 Beruhigt sich bei vertrauten Stimmen und Musik",
+            "🤲 Hält Kopf für kurze Momente aufrecht, wenn man es trägt",
+            "💤 Beginnt Schlaf-Wach-Rhythmus zu entwickeln",
+            "😊 Erhöhte Wachphasen und gesteigertes Interesse an der Umgebung"
+        )),
+        DevelopmentMilestone(28, 42, "Woche 4–6 (4–6 Wochen)", listOf(
+            "👁️ Bevorzugt Kontraste und schwarz-weiße Muster; Farbwahrnehmung beginnt",
+            "😊 Erstes echtes soziales Lächeln – reagiert auf ein lächelndes Gesicht",
+            "🗣️ Erste Gurr- und Gurgellaute (Vokalisierung beginnt)",
+            "🤲 Hebt Kopf beim Bauchliegen kurz an",
+            "👂 Reagiert auf laute Geräusche mit Schreckreaktion (Moro-Reflex)"
+        )),
+        DevelopmentMilestone(42, 56, "Woche 6–8 (6–8 Wochen)", listOf(
+            "👁️ Verfolgt Objekte horizontal über 90°; erkennt bekannte Gesichter",
+            "😊 Lächelt aktiv auf Ansprache; zeigt erste soziale Reaktionen",
+            "🗣️ Vokalisiert häufiger: a-a-a, ö-ö-ö als Antwort auf Sprechen",
+            "🤲 Hält Kopf beim Bauchliegen für einige Sekunden (45°)",
+            "🧸 Interessiert sich für bunte, bewegliche Gegenstände"
+        )),
+        DevelopmentMilestone(56, 84, "Woche 8–12 (2–3 Monate)", listOf(
+            "👁️ Verfolgt Objekte über 180° horizontal und beginnt auch vertikal zu tracken",
+            "😊 Lacht laut auf; erkennt Eltern zuverlässig",
+            "🗣️ Plappern und Lallen nehmen zu; 'Gespräche' mit Eltern möglich",
+            "🤲 Schlägt nach hängenden Gegenständen; Kopf stabil bei Körperaufrichtung",
+            "🧠 Zeigt Erwartung: wird ruhiger, wenn Flasche/Brust naht"
+        )),
+        DevelopmentMilestone(84, 112, "Woche 12–16 (3–4 Monate)", listOf(
+            "👁️ Dreidimensionales Sehen entwickelt sich; greift gezielt nach Objekten",
+            "😊 Zeigt Freude, Aufregung und erste Frustration deutlich",
+            "🗣️ Lacht und quiekt; ahmt Klänge nach",
+            "🤲 Dreht sich von Bauch auf Rücken; hält Kopf stabil",
+            "🧸 Greift Spielzeug und führt es zum Mund"
+        )),
+        DevelopmentMilestone(112, 168, "Woche 16–24 (4–6 Monate)", listOf(
+            "👁️ Erkennt Objekte auch aus größerer Entfernung; beginnt Spiegel zu beobachten",
+            "😊 Lacht laut und ansteckend; zeigt Freude an sozialen Spielen",
+            "🗣️ Babbling (ba-ba, ma-ma) beginnt; kommuniziert mit Geräuschen",
+            "🤲 Sitzt kurz mit Unterstützung; dreht sich vom Rücken auf den Bauch",
+            "🍽️ Erste Anzeichen von Interesse am Essen der Eltern (ab ca. 6 Monaten)"
+        )),
+        DevelopmentMilestone(168, 365, "Monat 6–12 (6–12 Monate)", listOf(
+            "👁️ Vollständige Farbwahrnehmung wie Erwachsene; verfolgt auch schnelle Bewegungen",
+            "😊 Fremdelphase beginnt (ca. 8. Monat); bevorzugt bekannte Bezugspersonen",
+            "🗣️ 'Mama', 'Papa' mit Bedeutung (ca. 9–12 Monate); Wortverständnis wächst",
+            "🤲 Krabbeln, Hochziehen, erste Schritte mit Unterstützung",
+            "🧠 Zeigt Objekte, Pinzettengriff, Symbolgesten wie Winken"
+        ))
+    )
+
+    private fun setupDevelopmentMilestones() {
+        renderDevelopmentMilestones()
+        binding.btnDevelopmentRefresh.setOnClickListener {
+            renderDevelopmentMilestones()
+        }
+    }
+
+    private fun renderDevelopmentMilestones() {
+        val birthTime = when {
+            geburtszeit > 0L -> geburtszeit
+            kinder.isNotEmpty() && kinder[0].geburtszeit > 0L -> kinder[0].geburtszeit
+            else -> 0L
+        }
+
+        val container = binding.llDevelopmentMilestones
+        container.removeAllViews()
+
+        if (birthTime == 0L) {
+            binding.tvDevelopmentAge.text = "Alter: – (Geburtszeit noch nicht eingetragen)"
+            val hint = TextView(this).apply {
+                text = "Bitte trage die Geburtszeit unter '📋 Eckdaten' ein, um altersgerechte Meilensteine zu sehen."
+                textSize = 13f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 4, 0, 0)
+            }
+            container.addView(hint)
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val ageMs = now - birthTime
+        val ageDays = TimeUnit.MILLISECONDS.toDays(ageMs).toInt().coerceAtLeast(0)
+        val ageWeeks = ageDays / 7
+        val ageDaysRest = ageDays % 7
+
+        val ageText = when {
+            ageDays < 14 -> "$ageDays ${if (ageDays == 1) "Tag" else "Tage"} alt"
+            ageDays < 84 -> "$ageWeeks ${if (ageWeeks == 1) "Woche" else "Wochen"}${if (ageDaysRest > 0) " und $ageDaysRest ${if (ageDaysRest == 1) "Tag" else "Tage"}" else ""} alt"
+            else -> {
+                val birthCal = Calendar.getInstance().apply { timeInMillis = birthTime }
+                val nowCal = Calendar.getInstance()
+                val months = (nowCal.get(Calendar.YEAR) - birthCal.get(Calendar.YEAR)) * 12 +
+                    (nowCal.get(Calendar.MONTH) - birthCal.get(Calendar.MONTH))
+                val afterMonths = Calendar.getInstance().apply {
+                    timeInMillis = birthTime
+                    add(Calendar.MONTH, months)
+                }
+                val restDays = TimeUnit.MILLISECONDS.toDays(nowCal.timeInMillis - afterMonths.timeInMillis).toInt().coerceAtLeast(0)
+                "$months ${if (months == 1) "Monat" else "Monate"}${if (restDays > 0) " und $restDays ${if (restDays == 1) "Tag" else "Tage"}" else ""} alt"
+            }
+        }
+        binding.tvDevelopmentAge.text = "Alter: $ageText"
+
+        val milestone = developmentMilestones.firstOrNull { ageDays in it.fromDays until it.toDays }
+            ?: developmentMilestones.last()
+
+        // Section title
+        val tvTitle = TextView(this).apply {
+            text = "📅 ${milestone.title}"
+            textSize = 14f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTextColor(getColor(R.color.primary_dark))
+            setPadding(0, 0, 0, 8)
+        }
+        container.addView(tvTitle)
+
+        // Divider
+        val divider = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1
+            ).also { it.setMargins(0, 0, 0, 10) }
+            setBackgroundColor(getColor(R.color.divider))
+        }
+        container.addView(divider)
+
+        // Milestone items
+        milestone.items.forEach { item ->
+            val tv = TextView(this).apply {
+                text = item
+                textSize = 13f
+                setTextColor(getColor(R.color.text_primary))
+                setPadding(0, 4, 0, 6)
+            }
+            container.addView(tv)
+        }
+
+        // Hint for next milestone
+        val nextMilestone = developmentMilestones.firstOrNull { it.fromDays > ageDays }
+        if (nextMilestone != null) {
+            val daysUntilNext = nextMilestone.fromDays - ageDays
+            val divider2 = View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 1
+                ).also { it.setMargins(0, 8, 0, 8) }
+                setBackgroundColor(getColor(R.color.divider))
+            }
+            container.addView(divider2)
+            val tvNext = TextView(this).apply {
+                text = "⏭️ Nächste Stufe in $daysUntilNext ${if (daysUntilNext == 1) "Tag" else "Tagen"}: ${nextMilestone.title}"
+                textSize = 12f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(0, 0, 0, 4)
+            }
+            container.addView(tvNext)
+        }
+    }
+
     private fun setupPhasen() {
         currentPhaseIndex = profilePrefs("phasen")
             .getInt("currentPhase", 0)
@@ -2841,7 +3024,8 @@ class MainActivity : AppCompatActivity() {
             binding.cardTimer, binding.cardMilestones, binding.cardMedical, binding.cardWishes,
             binding.cardLabor, binding.cardNotes, binding.cardKids,
             binding.cardBetreuung, binding.cardHospital, binding.cardChecklist,
-            binding.cardContacts, binding.cardAudioNotizen, binding.cardEckdaten, binding.cardTracker
+            binding.cardContacts, binding.cardAudioNotizen, binding.cardEckdaten, binding.cardTracker,
+            binding.cardDevelopment
         )
         val visibleCards = phase.visibleCards(binding)
         allCards.forEach { card ->
