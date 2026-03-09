@@ -2963,15 +2963,60 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(divider)
 
-        // Milestone items
-        milestone.items.forEach { item ->
-            val tv = TextView(this).apply {
+        // Milestone items with confirmable checkboxes
+        val milestonePrefs = profilePrefs("development_milestones_confirmed")
+        val celebrationKey = "milestone_${milestone.fromDays}_celebrated"
+
+        fun countConfirmed() = milestone.items.indices.count { idx ->
+            milestonePrefs.getBoolean("milestone_${milestone.fromDays}_$idx", false)
+        }
+
+        val tvProgress = TextView(this).apply {
+            text = "✅ ${countConfirmed()}/${milestone.items.size} beobachtet"
+            textSize = 12f
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, 0, 0, 6)
+        }
+        container.addView(tvProgress)
+
+        milestone.items.forEachIndexed { idx, item ->
+            val key = "milestone_${milestone.fromDays}_$idx"
+            val isConfirmed = milestonePrefs.getBoolean(key, false)
+            val cb = CheckBox(this).apply {
                 text = item
                 textSize = 13f
-                setTextColor(getColor(R.color.text_primary))
+                isChecked = isConfirmed
                 setPadding(0, 4, 0, 6)
+                if (isConfirmed) {
+                    paintFlags = paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
+                    setTextColor(getColor(R.color.text_secondary))
+                } else {
+                    setTextColor(getColor(R.color.text_primary))
+                }
+                setOnCheckedChangeListener { _, checked ->
+                    milestonePrefs.edit().putBoolean(key, checked).apply()
+                    if (checked) {
+                        paintFlags = paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
+                        setTextColor(getColor(R.color.text_secondary))
+                    } else {
+                        paintFlags = paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
+                        setTextColor(getColor(R.color.text_primary))
+                    }
+                    val newCount = countConfirmed()
+                    tvProgress.text = "✅ $newCount/${milestone.items.size} beobachtet"
+                    if (checked && newCount == milestone.items.size &&
+                        !milestonePrefs.getBoolean(celebrationKey, false)
+                    ) {
+                        milestonePrefs.edit().putBoolean(celebrationKey, true).apply()
+                        Toast.makeText(
+                            this@MainActivity,
+                            "🎉 Alle Meilensteine dieser Stufe beobachtet!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
             }
-            container.addView(tv)
+            container.addView(cb)
         }
 
         // Hint for next milestone
