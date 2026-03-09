@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.pm.PackageInfoCompat
 
 class SplashActivity : AppCompatActivity() {
 
@@ -21,7 +22,7 @@ class SplashActivity : AppCompatActivity() {
 
         val packageInfo = packageManager.getPackageInfo(packageName, 0)
         val versionName = packageInfo.versionName
-        val versionCode = packageInfo.longVersionCode
+        val versionCode = PackageInfoCompat.getLongVersionCode(packageInfo)
 
         findViewById<TextView>(R.id.tvSplashVersion).text =
             "Version $versionName (Build $versionCode)"
