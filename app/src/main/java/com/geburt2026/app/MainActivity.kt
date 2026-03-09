@@ -2979,14 +2979,36 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(tvProgress)
 
+        val dateFmt = SimpleDateFormat("dd. MMMM yyyy", Locale.GERMAN)
+        fun formatCheckDate(ts: Long) = "📅 Beobachtet am ${dateFmt.format(Date(ts))}"
+
         milestone.items.forEachIndexed { idx, item ->
             val key = "milestone_${milestone.fromDays}_$idx"
+            val dateKey = "${key}_date"
             val isConfirmed = milestonePrefs.getBoolean(key, false)
+            val savedDate = milestonePrefs.getLong(dateKey, 0L)
+
+            val itemWrapper = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            }
+
+            val tvDate = TextView(this).apply {
+                textSize = 11f
+                setTextColor(getColor(R.color.text_secondary))
+                setPadding(48, 0, 0, 8)
+                visibility = if (isConfirmed && savedDate > 0L) View.VISIBLE else View.GONE
+                text = if (isConfirmed && savedDate > 0L) formatCheckDate(savedDate) else ""
+            }
+
             val cb = CheckBox(this).apply {
                 text = item
                 textSize = 13f
                 isChecked = isConfirmed
-                setPadding(0, 4, 0, 6)
+                setPadding(0, 4, 0, 2)
                 if (isConfirmed) {
                     paintFlags = paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
                     setTextColor(getColor(R.color.text_secondary))
@@ -2994,14 +3016,22 @@ class MainActivity : AppCompatActivity() {
                     setTextColor(getColor(R.color.text_primary))
                 }
                 setOnCheckedChangeListener { _, checked ->
-                    milestonePrefs.edit().putBoolean(key, checked).apply()
+                    val editor = milestonePrefs.edit()
+                    editor.putBoolean(key, checked)
                     if (checked) {
+                        val now = System.currentTimeMillis()
+                        editor.putLong(dateKey, now)
+                        tvDate.text = formatCheckDate(now)
+                        tvDate.visibility = View.VISIBLE
                         paintFlags = paintFlags or android.graphics.Paint.STRIKE_THRU_TEXT_FLAG
                         setTextColor(getColor(R.color.text_secondary))
                     } else {
+                        editor.remove(dateKey)
+                        tvDate.visibility = View.GONE
                         paintFlags = paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
                         setTextColor(getColor(R.color.text_primary))
                     }
+                    editor.apply()
                     val newCount = countConfirmed()
                     tvProgress.text = "✅ $newCount/${milestone.items.size} beobachtet"
                     if (checked && newCount == milestone.items.size &&
@@ -3016,7 +3046,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            container.addView(cb)
+
+            itemWrapper.addView(cb)
+            itemWrapper.addView(tvDate)
+            container.addView(itemWrapper)
         }
 
         // Hint for next milestone
