@@ -4342,6 +4342,12 @@ class MainActivity : AppCompatActivity() {
             🔴 Rote gestrichelte Linie – „Kritisch −10 %"
             Diese Linie markiert 90 % des Geburtsgewichts. Ein Gewichtsverlust von mehr als 10 % gilt als medizinische Warngrenze und sollte ärztlich abgeklärt werden, da er auf unzureichende Nahrungsaufnahme oder Dehydration hinweisen kann.
 
+            📊 Unterer Bereich – „Tägliche Veränderung"
+            Zeigt die Gewichtszu- oder -abnahme in Gramm pro Tag zwischen je zwei Messungen:
+            • 🟠 Orange Linie/Punkte: tatsächliche tägliche Veränderung
+            • 🟢 Grün gestrichelt: empfohlene tägliche Veränderung nach Leitlinien
+            • Nulllinie (grau): kein Gewichtswechsel
+
             ℹ️ Die Empfehlungswerte dienen als Orientierung. Individuelle Abweichungen sind normal – bitte immer Rücksprache mit der Hebamme oder dem Kinderarzt halten.
         """.trimIndent()
 
