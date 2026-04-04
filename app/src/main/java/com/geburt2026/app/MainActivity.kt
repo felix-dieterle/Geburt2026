@@ -4276,6 +4276,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnTrackerPipi.setOnClickListener { addTrackerEntry("pipi") }
         binding.btnTrackerStillen.setOnClickListener { addTrackerEntry("stillen") }
         binding.btnTrackerGewicht.setOnClickListener { showWeightInputDialog() }
+        binding.btnTrackerWindeln.setOnClickListener { showDiaperWeightInputDialog() }
     }
 
     private fun showWeightInputDialog() {
@@ -4326,6 +4327,58 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun showDiaperWeightInputDialog() {
+        var selectedTime = System.currentTimeMillis()
+        val sdf = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.GERMAN)
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 8)
+        }
+        val weightEdit = EditText(this).apply {
+            hint = "z.B. 420"
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+        val dateBtn = Button(this).apply {
+            text = "📅 ${sdf.format(Date(selectedTime))}"
+        }
+        container.addView(TextView(this).apply {
+            text = "Gesamtgewicht aller Windeln der letzten 24 Stunden in Gramm:"
+            textSize = 13f
+            setPadding(0, 0, 0, 8)
+        })
+        container.addView(weightEdit)
+        container.addView(dateBtn)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("🧷 Windeln 24h erfassen")
+            .setView(container)
+            .setPositiveButton("Speichern") { _, _ ->
+                val input = weightEdit.text.toString().trim()
+                val weightG = input.toDoubleOrNull()
+                if (weightG != null && weightG > 0) {
+                    trackerEntries.add(TrackerEntry(System.currentTimeMillis(), "windeln", selectedTime, weightG))
+                    saveTrackerEntries()
+                    renderTracker()
+                    Toast.makeText(this, "🧷 Windeln 24h: ${weightG.toInt()} g eingetragen!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Bitte gültige Gramm-Zahl eingeben.", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .create()
+
+        dateBtn.setOnClickListener {
+            val cal = Calendar.getInstance().apply { timeInMillis = selectedTime }
+            showDateTimePicker(cal) { newCal ->
+                selectedTime = newCal.timeInMillis
+                dateBtn.text = "📅 ${sdf.format(Date(selectedTime))}"
+            }
+        }
+
+        dialog.show()
+    }
+
     private fun showWeightChartInfoDialog() {
         val message = """
             📈 So liest du die Gewichtskurve:
@@ -4333,19 +4386,30 @@ class MainActivity : AppCompatActivity() {
             🔵 Blaue Linie
             Deine tatsächlich eingetragenen Gewichtsmessungen.
 
-            🟢 Grüne gestrichelte Linie – „Empfehlung"
+            🟢 Grüne gestrichelte Linie – „Richtlinie"
             Empfohlene Gewichtsentwicklung nach medizinischen Leitlinien:
             • Tage 0–5: Normaler Gewichtsabfall bis ca. −7 %
             • Tage 5–14: Erholung zurück auf das Geburtsgewicht
             • Ab Tag 14: Zunahme von ca. 25 g/Tag
 
+            🩵 Türkise gestrichelte Linie – „Optimal"
+            Optimale Gewichtsentwicklung (bester Fall):
+            • Tage 0–4: Geringer Gewichtsabfall bis ca. −5 %
+            • Tage 4–10: Erholung zurück auf das Geburtsgewicht
+            • Ab Tag 10: Zunahme von ca. 28 g/Tag
+
+            🟡 Orangegelbe gestrichelte Linie – „Warnung −8 %"
+            Frühwarnschwelle bei −8 % des Geburtsgewichts. Bei Unterschreitung dieser Linie sollte die Situation beobachtet werden.
+
             🔴 Rote gestrichelte Linie – „Kritisch −10 %"
-            Diese Linie markiert 90 % des Geburtsgewichts. Ein Gewichtsverlust von mehr als 10 % gilt als medizinische Warngrenze und sollte ärztlich abgeklärt werden, da er auf unzureichende Nahrungsaufnahme oder Dehydration hinweisen kann.
+            Diese Linie markiert 90 % des Geburtsgewichts. Ein Gewichtsverlust von mehr als 10 % gilt als medizinische Warngrenze und sollte ärztlich abgeklärt werden.
 
             📊 Unterer Bereich – „Tägliche Veränderung"
             Zeigt die Gewichtszu- oder -abnahme in Gramm pro Tag zwischen je zwei Messungen:
             • 🟠 Orange Linie/Punkte: tatsächliche tägliche Veränderung
-            • 🟢 Grün gestrichelt: empfohlene tägliche Veränderung nach Leitlinien
+            • 🟢 Grün gestrichelt: empfohlene tägliche Veränderung (Richtlinie)
+            • 🩵 Türkis gestrichelt: optimale tägliche Veränderung
+            • 🟡 Orangegelb gestrichelt: Warnschwelle (bis Tag 14: kein Verlust, ab Tag 14: min. +15 g/Tag)
             • Nulllinie (grau): kein Gewichtswechsel
 
             ℹ️ Die Empfehlungswerte dienen als Orientierung. Individuelle Abweichungen sind normal – bitte immer Rücksprache mit der Hebamme oder dem Kinderarzt halten.
@@ -4545,6 +4609,20 @@ class MainActivity : AppCompatActivity() {
             binding.llWeightChart.visibility = android.view.View.GONE
         }
 
+        // 24h diaper weight summary
+        val diaperEntries = trackerEntries.filter { it.category == "windeln" && it.value != null }
+            .sortedByDescending { it.timestamp }
+        if (diaperEntries.isNotEmpty()) {
+            val latestDiaper = diaperEntries.first()
+            val sdfDiaper = SimpleDateFormat("dd.MM.", Locale.GERMAN)
+            summaryLayout.addView(TextView(this).apply {
+                text = "🧷 Windeln 24h: ${latestDiaper.value?.toInt()} g  |  ${sdfDiaper.format(Date(latestDiaper.timestamp))}  |  ${diaperEntries.size} ${if (diaperEntries.size == 1) "Eintrag" else "Einträge"}"
+                textSize = 14f
+                setTextColor(getColor(R.color.text_primary))
+                setPadding(0, 4, 0, 4)
+            })
+        }
+
         val recentLayout = binding.llTrackerEntries
         recentLayout.removeAllViews()
         val recent = trackerEntries.filter { it.category != "gewicht" }.sortedByDescending { it.timestamp }.take(20)
@@ -4562,6 +4640,7 @@ class MainActivity : AppCompatActivity() {
                     "pipi" -> "💧"
                     "stillen" -> "🤱"
                     "gewicht" -> "⚖️"
+                    "windeln" -> "🧷"
                     else -> "•"
                 }
                 val entryLabel = when (entry.category) {
@@ -4569,6 +4648,7 @@ class MainActivity : AppCompatActivity() {
                     "pipi" -> "Pipi"
                     "stillen" -> "Stillen"
                     "gewicht" -> if (entry.value != null) "Gewicht: ${entry.value.toInt()} g" else "Gewicht"
+                    "windeln" -> if (entry.value != null) "Windeln 24h: ${entry.value.toInt()} g" else "Windeln 24h"
                     else -> entry.category
                 }
                 val elapsed = now - entry.timestamp

@@ -71,6 +71,23 @@ class WeightChartView @JvmOverloads constructor(
         pathEffect = DashPathEffect(floatArrayOf(8f, 6f), 0f)
     }
 
+    /** Dashed teal line – optimal (best-case) weight trajectory. */
+    private val optimalLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#00838F")
+        strokeWidth = 2.5f
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+        pathEffect = DashPathEffect(floatArrayOf(12f, 7f), 0f)
+    }
+
+    /** Dashed amber line – early-warning weight threshold (−8 %). */
+    private val warningLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F57F17")
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+        pathEffect = DashPathEffect(floatArrayOf(8f, 5f), 0f)
+    }
+
     private val legendPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textSize = 22f
         textAlign = Paint.Align.LEFT
@@ -97,6 +114,23 @@ class WeightChartView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
         pathEffect = DashPathEffect(floatArrayOf(10f, 6f), 0f)
+    }
+
+    /** Dashed teal line – optimal daily weight-change (derivative of optimal trajectory). */
+    private val diffOptimalPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#00838F")
+        strokeWidth = 2.5f
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+        pathEffect = DashPathEffect(floatArrayOf(12f, 7f), 0f)
+    }
+
+    /** Dashed amber line – warning daily weight-change threshold. */
+    private val diffWarningPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#F57F17")
+        strokeWidth = 2f
+        style = Paint.Style.STROKE
+        pathEffect = DashPathEffect(floatArrayOf(8f, 5f), 0f)
     }
 
     /** Horizontal zero-line for the difference chart. */
@@ -173,6 +207,52 @@ class WeightChartView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Returns the optimal (best-case) weight (g) for [daysSinceBirth] days:
+     *  - Days 0–4:  max loss to −5 % (−1.25 %/day × 4 days = −5 % total)
+     *  - Days 4–10: recovery back to birth weight
+     *  - Day 10+:   gain of ~28 g/day
+     */
+    private fun optimalWeightAt(daysSinceBirth: Double): Double {
+        if (birthWeight <= 0) return 0.0
+        return when {
+            daysSinceBirth < 0 -> birthWeight
+            daysSinceBirth <= 4.0 -> birthWeight * (1.0 - 0.0125 * daysSinceBirth) // −1.25 %/day → max −5 %
+            daysSinceBirth <= 10.0 -> birthWeight * (0.95 + 0.05 * (daysSinceBirth - 4.0) / 6.0)
+            else -> birthWeight + 28.0 * (daysSinceBirth - 10.0)
+        }
+    }
+
+    /**
+     * Returns the optimal daily weight change (g/day), i.e. the derivative of [optimalWeightAt]:
+     *  - Days 0–4:   −birthWeight × 1.25 % / day
+     *  - Days 4–10:  +birthWeight × 5 % / 6 days (recovery)
+     *  - Day 10+:    +28 g/day
+     */
+    private fun optimalDiffAt(daysSinceBirth: Double): Double {
+        if (birthWeight <= 0) return 0.0
+        return when {
+            daysSinceBirth <= 4.0 -> -birthWeight * 0.0125
+            daysSinceBirth <= 10.0 -> birthWeight * 0.05 / 6.0
+            else -> 28.0
+        }
+    }
+
+    /**
+     * Returns the warning daily weight-change threshold (g/day):
+     *  - Days 0–7:   losing more than 2 %/day is a concern
+     *  - Days 7–14:  should not be losing weight at all
+     *  - Day 14+:    minimum acceptable gain of +15 g/day
+     */
+    private fun warningDiffAt(daysSinceBirth: Double): Double {
+        if (birthWeight <= 0) return 0.0
+        return when {
+            daysSinceBirth <= 7.0 -> -birthWeight * 0.020
+            daysSinceBirth <= 14.0 -> 0.0
+            else -> 15.0
+        }
+    }
+
     // ── Drawing ───────────────────────────────────────────────────────────────
 
     override fun onDraw(canvas: Canvas) {
@@ -184,7 +264,7 @@ class WeightChartView @JvmOverloads constructor(
 
         val padL = 16f
         val padR = 16f
-        val padT = 42f   // space for legend row above main chart
+        val padT = 66f   // space for 2-row legend above main chart
         val chartW = w - padL - padR
 
         val hasBirthData = birthWeight > 0 && birthTimestamp > 0L
@@ -226,8 +306,12 @@ class WeightChartView @JvmOverloads constructor(
         val values = dataPoints.map { it.second }.toMutableList()
         if (hasBirthData) {
             val daysCovered = (maxTime - birthTimestamp).toDouble() / msPerDay
-            listOf(0.0, 5.0, 14.0, daysCovered).forEach { d -> values.add(recommendedWeightAt(d)) }
+            listOf(0.0, 5.0, 14.0, daysCovered).forEach { d ->
+                values.add(recommendedWeightAt(d))
+                values.add(optimalWeightAt(d))
+            }
             values.add(birthWeight * 0.90)
+            values.add(birthWeight * 0.92)
         }
         val minVal = (values.minOrNull() ?: 0.0) * 0.97
         val maxVal = (values.maxOrNull() ?: 0.0) * 1.03
@@ -246,35 +330,60 @@ class WeightChartView @JvmOverloads constructor(
             val steps = (endDays * 2).toInt().coerceAtLeast(30)
 
             val recPath = Path()
-            var first = true
+            val optPath = Path()
+            var firstRec = true
+            var firstOpt = true
             for (i in 0..steps) {
                 val d = i * endDays / steps
                 val ts = birthTimestamp + (d * msPerDay).toLong()
                 val x = xFor(ts)
-                val y = yForMain(recommendedWeightAt(d))
-                if (first) { recPath.moveTo(x, y); first = false } else recPath.lineTo(x, y)
+
+                val yRec = yForMain(recommendedWeightAt(d))
+                if (firstRec) { recPath.moveTo(x, yRec); firstRec = false } else recPath.lineTo(x, yRec)
+
+                val yOpt = yForMain(optimalWeightAt(d))
+                if (firstOpt) { optPath.moveTo(x, yOpt); firstOpt = false } else optPath.lineTo(x, yOpt)
             }
             canvas.drawPath(recPath, recommendedLinePaint)
+            canvas.drawPath(optPath, optimalLinePaint)
+
+            // Warning at −8 % of birth weight (amber horizontal line)
+            val warningY = yForMain(birthWeight * 0.92)
+            canvas.drawLine(padL, warningY, padL + chartW, warningY, warningLinePaint)
 
             // Critical 10 % weight loss line (dashed red)
             val critY = yForMain(birthWeight * 0.90)
             canvas.drawLine(padL, critY, padL + chartW, critY, criticalLinePaint)
 
-            // Legend row
-            val legendY = padT - 4f
-            val swatchSize = 18f
-            val gap = 6f
+            // ── 2-row legend ──────────────────────────────────────────────────
+            val swatchSize = 16f
+            val gap = 5f
+            val row1Y = padT - 26f
+            val row2Y = padT - 6f
             var lx = padL
 
+            // Row 1: Richtlinie | Optimal
             legendPaint.color = Color.parseColor("#2E7D32")
-            canvas.drawRect(lx, legendY - swatchSize, lx + swatchSize, legendY, legendPaint)
+            legendPaint.textSize = 20f
             legendPaint.textAlign = Paint.Align.LEFT
-            canvas.drawText("Empfehlung", lx + swatchSize + gap, legendY, legendPaint)
-            lx += swatchSize + gap + legendPaint.measureText("Empfehlung") + 14f
+            canvas.drawRect(lx, row1Y - swatchSize, lx + swatchSize, row1Y, legendPaint)
+            canvas.drawText("Richtlinie", lx + swatchSize + gap, row1Y, legendPaint)
+            lx += swatchSize + gap + legendPaint.measureText("Richtlinie") + 12f
+
+            legendPaint.color = Color.parseColor("#00838F")
+            canvas.drawRect(lx, row1Y - swatchSize, lx + swatchSize, row1Y, legendPaint)
+            canvas.drawText("Optimal", lx + swatchSize + gap, row1Y, legendPaint)
+
+            // Row 2: Warnung −8% | Kritisch −10%
+            lx = padL
+            legendPaint.color = Color.parseColor("#F57F17")
+            canvas.drawRect(lx, row2Y - swatchSize, lx + swatchSize, row2Y, legendPaint)
+            canvas.drawText("Warnung −8%", lx + swatchSize + gap, row2Y, legendPaint)
+            lx += swatchSize + gap + legendPaint.measureText("Warnung −8%") + 12f
 
             legendPaint.color = Color.parseColor("#C62828")
-            canvas.drawRect(lx, legendY - swatchSize, lx + swatchSize, legendY, legendPaint)
-            canvas.drawText("Kritisch −10%", lx + swatchSize + gap, legendY, legendPaint)
+            canvas.drawRect(lx, row2Y - swatchSize, lx + swatchSize, row2Y, legendPaint)
+            canvas.drawText("Kritisch −10%", lx + swatchSize + gap, row2Y, legendPaint)
         }
 
         // ── Actual measurement data ───────────────────────────────────────────
@@ -336,9 +445,13 @@ class WeightChartView @JvmOverloads constructor(
         // --- Diff chart value range -------------------------------------------
         val diffValues = diffPoints.map { it.second }.toMutableList()
         if (hasBirthData) {
-            // Include key recommended-diff values in the range
+            // Include key recommended-diff, optimal, and warning values in the range
             val lastDays = (chartMaxTime - birthTimestamp).toDouble() / msPerDay
-            listOf(0.0, 5.0, 14.0, lastDays).forEach { d -> diffValues.add(recommendedDiffAt(d)) }
+            listOf(0.0, 5.0, 7.0, 10.0, 14.0, lastDays).forEach { d ->
+                diffValues.add(recommendedDiffAt(d))
+                diffValues.add(optimalDiffAt(d))
+                diffValues.add(warningDiffAt(d))
+            }
         }
         diffValues.add(0.0) // always include 0 in range
 
@@ -354,26 +467,40 @@ class WeightChartView @JvmOverloads constructor(
 
         canvas.drawText("Tägliche Veränderung (g/Tag)", padL, diffTop + 18f, sectionLabelPaint)
 
-        // Diff legend (top-right of section)
-        val dLegendY = diffTop + 18f
-        val swatchSize = 14f
-        val gap = 5f
-        var dlx = padL + sectionLabelPaint.measureText("Tägliche Veränderung (g/Tag)") + 12f
-        if (dlx + 140f > w) dlx = w - 140f // clamp to view width
-
-        legendPaint.color = Color.parseColor("#E65100")
+        // Diff legend – 2 rows on the right side of the section label
+        val dLegendY1 = diffTop + 18f
+        val dLegendY2 = diffTop + 36f
+        val dSwatchSize = 13f
+        val dGap = 4f
+        legendPaint.textSize = 19f
         legendPaint.textAlign = Paint.Align.LEFT
-        canvas.drawRect(dlx, dLegendY - swatchSize, dlx + swatchSize, dLegendY, legendPaint)
-        canvas.drawText("Ist", dlx + swatchSize + gap, dLegendY, legendPaint)
-        dlx += swatchSize + gap + legendPaint.measureText("Ist") + 10f
+
+        var dlx = padL + sectionLabelPaint.measureText("Tägliche Veränderung (g/Tag)") + 10f
+        if (dlx + 160f > w) dlx = w - 160f // clamp
+
+        // Row 1: Ist | Richtlinie
+        legendPaint.color = Color.parseColor("#E65100")
+        canvas.drawRect(dlx, dLegendY1 - dSwatchSize, dlx + dSwatchSize, dLegendY1, legendPaint)
+        canvas.drawText("Ist", dlx + dSwatchSize + dGap, dLegendY1, legendPaint)
+        var dlx2 = dlx + dSwatchSize + dGap + legendPaint.measureText("Ist") + 8f
 
         if (hasBirthData) {
             legendPaint.color = Color.parseColor("#2E7D32")
-            canvas.drawRect(dlx, dLegendY - swatchSize, dlx + swatchSize, dLegendY, legendPaint)
-            canvas.drawText("Empfohlen", dlx + swatchSize + gap, dLegendY, legendPaint)
+            canvas.drawRect(dlx2, dLegendY1 - dSwatchSize, dlx2 + dSwatchSize, dLegendY1, legendPaint)
+            canvas.drawText("Richtlinie", dlx2 + dSwatchSize + dGap, dLegendY1, legendPaint)
+
+            // Row 2: Optimal | Warnung
+            legendPaint.color = Color.parseColor("#00838F")
+            canvas.drawRect(dlx, dLegendY2 - dSwatchSize, dlx + dSwatchSize, dLegendY2, legendPaint)
+            canvas.drawText("Optimal", dlx + dSwatchSize + dGap, dLegendY2, legendPaint)
+            dlx2 = dlx + dSwatchSize + dGap + legendPaint.measureText("Optimal") + 8f
+
+            legendPaint.color = Color.parseColor("#F57F17")
+            canvas.drawRect(dlx2, dLegendY2 - dSwatchSize, dlx2 + dSwatchSize, dLegendY2, legendPaint)
+            canvas.drawText("Warnung", dlx2 + dSwatchSize + dGap, dLegendY2, legendPaint)
         }
 
-        val diffChartAreaTop = diffTop + 26f   // below label
+        val diffChartAreaTop = diffTop + 44f   // below 2-row label+legend
         val diffChartAreaH = h - 24f - diffChartAreaTop
 
         fun yForDiffSection(v: Double): Float =
@@ -387,22 +514,33 @@ class WeightChartView @JvmOverloads constructor(
         labelPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("0", padL, zeroY - 3f, labelPaint)
 
-        // --- Recommended diff line (dashed green) -----------------------------
+        // --- Recommended, optimal and warning diff lines ----------------------
         if (hasBirthData) {
             val lastDays = (chartMaxTime - birthTimestamp).toDouble() / msPerDay
             val endDays = maxOf(lastDays, 14.0)
             val steps = (endDays * 2).toInt().coerceAtLeast(30)
 
             val recDiffPath = Path()
-            var first = true
+            val optDiffPath = Path()
+            val warnDiffPath = Path()
+            var firstRec = true; var firstOpt = true; var firstWarn = true
             for (i in 0..steps) {
                 val d = i * endDays / steps
                 val ts = birthTimestamp + (d * msPerDay).toLong()
                 val x = xFor(ts)
-                val y = yForDiffSection(recommendedDiffAt(d))
-                if (first) { recDiffPath.moveTo(x, y); first = false } else recDiffPath.lineTo(x, y)
+
+                val yRec = yForDiffSection(recommendedDiffAt(d))
+                if (firstRec) { recDiffPath.moveTo(x, yRec); firstRec = false } else recDiffPath.lineTo(x, yRec)
+
+                val yOpt = yForDiffSection(optimalDiffAt(d))
+                if (firstOpt) { optDiffPath.moveTo(x, yOpt); firstOpt = false } else optDiffPath.lineTo(x, yOpt)
+
+                val yWarn = yForDiffSection(warningDiffAt(d))
+                if (firstWarn) { warnDiffPath.moveTo(x, yWarn); firstWarn = false } else warnDiffPath.lineTo(x, yWarn)
             }
             canvas.drawPath(recDiffPath, diffRecommendedPaint)
+            canvas.drawPath(optDiffPath, diffOptimalPaint)
+            canvas.drawPath(warnDiffPath, diffWarningPaint)
         }
 
         // --- Actual diff line and dots ----------------------------------------
