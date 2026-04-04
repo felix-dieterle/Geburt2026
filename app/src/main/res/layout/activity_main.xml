@@ -1388,7 +1388,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:paddingBottom="12dp">
+                    android:paddingBottom="6dp">
 
                     <Button
                         android:id="@+id/btnTrackerKaka"
@@ -1417,20 +1417,37 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginStart="4dp"
-                        android:layout_marginEnd="4dp"
                         android:text="🤱 Stillen"
                         android:textSize="13sp"
                         android:backgroundTint="@color/primary_dark" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingBottom="12dp">
 
                     <Button
                         android:id="@+id/btnTrackerGewicht"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
                         android:text="⚖️ Gewicht"
                         android:textSize="13sp"
                         android:backgroundTint="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnTrackerWindeln"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="🧷 Windeln 24h"
+                        android:textSize="13sp"
+                        android:backgroundTint="@color/warning_orange" />
 
                 </LinearLayout>
 
@@ -1494,7 +1511,7 @@
                     <com.geburt2026.app.WeightChartView
                         android:id="@+id/weightChartView"
                         android:layout_width="match_parent"
-                        android:layout_height="340dp"
+                        android:layout_height="400dp"
                         android:layout_marginBottom="8dp" />
 
                 </LinearLayout>
