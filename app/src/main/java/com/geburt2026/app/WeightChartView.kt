@@ -209,7 +209,7 @@ class WeightChartView @JvmOverloads constructor(
 
     /**
      * Returns the optimal (best-case) weight (g) for [daysSinceBirth] days:
-     *  - Days 0–4:  max loss to −5 %
+     *  - Days 0–4:  max loss to −5 % (−1.25 %/day × 4 days = −5 % total)
      *  - Days 4–10: recovery back to birth weight
      *  - Day 10+:   gain of ~28 g/day
      */
@@ -217,7 +217,7 @@ class WeightChartView @JvmOverloads constructor(
         if (birthWeight <= 0) return 0.0
         return when {
             daysSinceBirth < 0 -> birthWeight
-            daysSinceBirth <= 4.0 -> birthWeight * (1.0 - 0.0125 * daysSinceBirth)
+            daysSinceBirth <= 4.0 -> birthWeight * (1.0 - 0.0125 * daysSinceBirth) // −1.25 %/day → max −5 %
             daysSinceBirth <= 10.0 -> birthWeight * (0.95 + 0.05 * (daysSinceBirth - 4.0) / 6.0)
             else -> birthWeight + 28.0 * (daysSinceBirth - 10.0)
         }

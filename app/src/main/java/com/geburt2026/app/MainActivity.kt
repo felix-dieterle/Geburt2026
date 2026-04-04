@@ -4398,7 +4398,7 @@ class MainActivity : AppCompatActivity() {
             • Tage 4–10: Erholung zurück auf das Geburtsgewicht
             • Ab Tag 10: Zunahme von ca. 28 g/Tag
 
-            🟡 Amber gestrichelte Linie – „Warnung −8 %"
+            🟡 Orangegelbe gestrichelte Linie – „Warnung −8 %"
             Frühwarnschwelle bei −8 % des Geburtsgewichts. Bei Unterschreitung dieser Linie sollte die Situation beobachtet werden.
 
             🔴 Rote gestrichelte Linie – „Kritisch −10 %"
@@ -4409,7 +4409,7 @@ class MainActivity : AppCompatActivity() {
             • 🟠 Orange Linie/Punkte: tatsächliche tägliche Veränderung
             • 🟢 Grün gestrichelt: empfohlene tägliche Veränderung (Richtlinie)
             • 🩵 Türkis gestrichelt: optimale tägliche Veränderung
-            • 🟡 Amber gestrichelt: Warnschwelle (bis Tag 14: kein Verlust, ab Tag 14: min. +15 g/Tag)
+            • 🟡 Orangegelb gestrichelt: Warnschwelle (bis Tag 14: kein Verlust, ab Tag 14: min. +15 g/Tag)
             • Nulllinie (grau): kein Gewichtswechsel
 
             ℹ️ Die Empfehlungswerte dienen als Orientierung. Individuelle Abweichungen sind normal – bitte immer Rücksprache mit der Hebamme oder dem Kinderarzt halten.
@@ -4616,7 +4616,7 @@ class MainActivity : AppCompatActivity() {
             val latestDiaper = diaperEntries.first()
             val sdfDiaper = SimpleDateFormat("dd.MM.", Locale.GERMAN)
             summaryLayout.addView(TextView(this).apply {
-                text = "🧷 Windeln 24h: ${latestDiaper.value?.toInt()} g  |  ${sdfDiaper.format(Date(latestDiaper.timestamp))}  |  ${diaperEntries.size} Eintrag/Einträge"
+                text = "🧷 Windeln 24h: ${latestDiaper.value?.toInt()} g  |  ${sdfDiaper.format(Date(latestDiaper.timestamp))}  |  ${diaperEntries.size} ${if (diaperEntries.size == 1) "Eintrag" else "Einträge"}"
                 textSize = 14f
                 setTextColor(getColor(R.color.text_primary))
                 setPadding(0, 4, 0, 4)
