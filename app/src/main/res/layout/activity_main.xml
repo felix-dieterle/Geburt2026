@@ -1601,6 +1601,74 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
+        <!-- Stress-Verlaufskurve Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardStress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:cardElevation="4dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/card_stress">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingBottom="6dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="😰 Stress-Verlaufskurve"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/primary_dark" />
+
+                    <Button
+                        android:id="@+id/btnStressChartInfo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ℹ️"
+                        android:textSize="16sp"
+                        android:contentDescription="Stresskurve erklären"
+                        style="@style/Widget.MaterialComponents.Button.TextButton" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Erwarteter Stresspegel: 6 Wochen zurück bis 3 Monate voraus"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingBottom="8dp" />
+
+                <com.geburt2026.app.StressChartView
+                    android:id="@+id/stressChartView"
+                    android:layout_width="match_parent"
+                    android:layout_height="380dp"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⚙️ Vorkonfiguriert für: 2 Geschwisterkinder (4,5 J. + 7 J.) • 4-Zimmer-Wohnung • Eltern 44 u. 39 Jahre"
+                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary"
+                    android:paddingTop="4dp" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
         <!-- Einstellungen Card -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cardEinstellungen"
