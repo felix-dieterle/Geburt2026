@@ -246,9 +246,9 @@ class StressChartView @JvmOverloads constructor(
         fun stressToY(pct: Double): Float = (chartB - pct / 100.0 * chartH).toFloat()
 
         // ── Coloured background zones ─────────────────────────────────────────
-        canvas.drawRect(chartL, stressToY(70.0), chartR, stressToY(0.0),   redZonePaint)
-        canvas.drawRect(chartL, stressToY(40.0), chartR, stressToY(-0.1), yellowZonePaint)
-        canvas.drawRect(chartL, chartB,           chartR, stressToY(40.0), greenZonePaint)
+        canvas.drawRect(chartL, stressToY(100.0), chartR, stressToY(70.0), redZonePaint)
+        canvas.drawRect(chartL, stressToY(70.0),  chartR, stressToY(40.0), yellowZonePaint)
+        canvas.drawRect(chartL, stressToY(40.0),  chartR, chartB,          greenZonePaint)
 
         // ── Horizontal grid + y-axis labels ───────────────────────────────────
         for (pct in listOf(20, 40, 60, 70, 80, 100)) {
