@@ -3557,7 +3557,7 @@ class MainActivity : AppCompatActivity() {
                 "6 Wochen vor bis 3 Monate nach der Geburt.\n\n" +
                 "🔵 Babygeschrei-Stress\n" +
                 "Der durch das Schreien des Babys ausgelöste Stress. " +
-                "Der Höhepunkt liegt typischerweise in Woche 4–6 (sog. „Schrei-Gipfel").\n\n" +
+                "Der Höhepunkt liegt typischerweise in Woche 4–6 (sog. \u201ESchrei-Gipfel\u201C).\n\n" +
                 "🟠 Familien-Stress (Geschwister)\n" +
                 "Der allgemeine Stresslevel der Familie, der neben dem Babyschreien " +
                 "auch Geschwistereifersucht, Logistik (Kita/Schule), Schlafmangel und " +
