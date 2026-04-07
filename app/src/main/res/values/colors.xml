@@ -28,4 +28,5 @@
     <color name="card_settings">#F9FBE7</color>
     <color name="card_tracker">#FFF3E0</color>
     <color name="card_development">#F1F8E9</color>
+    <color name="card_stress">#FFF3F3</color>
 </resources>

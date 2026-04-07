@@ -280,6 +280,7 @@ class MainActivity : AppCompatActivity() {
         setupAudioNotizen()
         setupTracker()
         setupDevelopmentMilestones()
+        setupStressChart()
         setupPhasen()
         setupEinstellungen()
     }
@@ -3534,6 +3535,44 @@ class MainActivity : AppCompatActivity() {
             Log.e("AudioNotiz", "Playback failed", e)
             Toast.makeText(this, "Wiedergabe fehlgeschlagen", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    // ── Stress-Verlaufskurve ──────────────────────────────────────────────────
+
+    private fun setupStressChart() {
+        val birthTime = when {
+            geburtszeit > 0L -> geburtszeit
+            kinder.isNotEmpty() && kinder[0].geburtszeit > 0L -> kinder[0].geburtszeit
+            else -> dueDateCalendar.timeInMillis
+        }
+        binding.stressChartView.setBirthTimestamp(birthTime)
+        binding.btnStressChartInfo.setOnClickListener { showStressChartInfoDialog() }
+    }
+
+    private fun showStressChartInfoDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("😰 Stress-Verlaufskurve – Erklärung")
+            .setMessage(
+                "Diese Kurve zeigt den erwarteten Stresspegel für eure Familie – " +
+                "6 Wochen vor bis 3 Monate nach der Geburt.\n\n" +
+                "🔵 Babygeschrei-Stress\n" +
+                "Der durch das Schreien des Babys ausgelöste Stress. " +
+                "Der Höhepunkt liegt typischerweise in Woche 4–6 (sog. „Schrei-Gipfel").\n\n" +
+                "🟠 Familien-Stress\n" +
+                "Der allgemeine Stresslevel der Familie, der neben dem Babyschreien " +
+                "auch Geschwistereifersucht, Logistik (Kita/Schule), Schlafmangel und " +
+                "die besondere Situation mit älteren Kindern berücksichtigt.\n\n" +
+                "🟢 Grüner Bereich (0–40 %): gut – weiter so!\n" +
+                "🟡 Gelber Bereich (40–70 %): erhöht – auf Pausen achten.\n" +
+                "🔴 Roter Bereich (70–100 %): hoch – Unterstützung einplanen.\n\n" +
+                "⚙️ Vorkonfiguriert für:\n" +
+                "• 2 Geschwisterkinder (4,5 J. + 7 J.)\n" +
+                "• 4-Zimmer-Wohnung\n" +
+                "• Eltern 44 und 39 Jahre\n\n" +
+                "Die Kurven sind Richtwerte und können je nach Familie variieren."
+            )
+            .setPositiveButton("Verstanden", null)
+            .show()
     }
 
     // ── Einstellungen ─────────────────────────────────────────────────────────
