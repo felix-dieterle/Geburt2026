@@ -173,67 +173,99 @@ class WeightChartView @JvmOverloads constructor(
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Returns the WHO/medical recommended weight (g) for [daysSinceBirth]
-     * days after birth, based on a piecewise model:
-     *  - Days 0–5: linear loss to 93 % (−7 % nadir)
-     *  - Days 5–14: linear recovery back to birth weight
-     *  - Day 14+: gain of ~25 g/day
+     * Cubic smoothstep: s(t) = t² × (3 − 2t)
+     * Maps t ∈ [0,1] → [0,1] with zero slope at both endpoints, producing
+     * a smooth S-shaped transition instead of a straight line.
      */
-    private fun recommendedWeightAt(daysSinceBirth: Double): Double {
-        if (birthWeight <= 0) return 0.0
-        return when {
-            daysSinceBirth < 0 -> birthWeight
-            daysSinceBirth <= 5.0 -> birthWeight * (1.0 - 0.014 * daysSinceBirth)
-            daysSinceBirth <= 14.0 -> birthWeight * (0.93 + 0.07 * (daysSinceBirth - 5.0) / 9.0)
-            else -> birthWeight + 25.0 * (daysSinceBirth - 14.0)
-        }
-    }
+    private fun smoothstep(t: Double): Double = t * t * (3.0 - 2.0 * t)
 
     private val msPerDay = 24 * 60 * 60 * 1000L
 
     /**
-     * Returns the recommended daily weight change (g/day) at [daysSinceBirth],
-     * i.e. the derivative of [recommendedWeightAt]:
-     *  - Days 0–5:  −birthWeight × 1.4 % / day  (initial loss)
-     *  - Days 5–14: +birthWeight × 0.07 / 9 g/day  (≈ 0.78 % / day, recovery)
-     *  - Day 14+:   +25 g/day                    (steady gain)
+     * Returns the WHO/medical recommended weight (g) for [daysSinceBirth]
+     * days after birth, using smooth S-curves (cubic smoothstep) for the
+     * loss and recovery phases so the curve looks natural rather than angular:
+     *  - Days 0–5:  smooth S-curve drop to 93 % (−7 % nadir)
+     *  - Days 5–14: smooth S-curve recovery back to birth weight
+     *  - Day 14+:   steady gain of ~25 g/day (linear – intentionally straight)
+     */
+    private fun recommendedWeightAt(daysSinceBirth: Double): Double {
+        if (birthWeight <= 0) return 0.0
+        return when {
+            daysSinceBirth < 0    -> birthWeight
+            daysSinceBirth <= 5.0 -> birthWeight * (1.0 - 0.07 * smoothstep(daysSinceBirth / 5.0))
+            daysSinceBirth <= 14.0 -> {
+                val s = smoothstep((daysSinceBirth - 5.0) / 9.0)
+                birthWeight * (0.93 + 0.07 * s)
+            }
+            else -> birthWeight + 25.0 * (daysSinceBirth - 14.0)
+        }
+    }
+
+    /**
+     * Returns the recommended daily weight change (g/day) at [daysSinceBirth].
+     * This is the analytical derivative of [recommendedWeightAt].
+     *
+     * The derivative of smoothstep s(t)=t²(3−2t) is s′(t)=6t(1−t), so:
+     *  - Days 0–5:   −birthWeight × 0.07 × 6t(1−t) / 5   (bell-shaped loss rate)
+     *  - Days 5–14:  +birthWeight × 0.07 × 6u(1−u) / 9   (bell-shaped recovery rate, u=(d−5)/9)
+     *  - Day 14+:    +25 g/day
      */
     private fun recommendedDiffAt(daysSinceBirth: Double): Double {
         if (birthWeight <= 0) return 0.0
         return when {
-            daysSinceBirth <= 5.0 -> -birthWeight * 0.014
-            daysSinceBirth <= 14.0 -> birthWeight * 0.07 / 9.0
+            daysSinceBirth <= 0.0  -> 0.0
+            daysSinceBirth <= 5.0  -> {
+                val t = daysSinceBirth / 5.0
+                -birthWeight * 0.07 * 6.0 * t * (1.0 - t) / 5.0
+            }
+            daysSinceBirth <= 14.0 -> {
+                val t = (daysSinceBirth - 5.0) / 9.0
+                birthWeight * 0.07 * 6.0 * t * (1.0 - t) / 9.0
+            }
             else -> 25.0
         }
     }
 
     /**
-     * Returns the optimal (best-case) weight (g) for [daysSinceBirth] days:
-     *  - Days 0–4:  max loss to −5 % (−1.25 %/day × 4 days = −5 % total)
-     *  - Days 4–10: recovery back to birth weight
-     *  - Day 10+:   gain of ~28 g/day
+     * Returns the optimal (best-case) weight (g) for [daysSinceBirth] days,
+     * using smooth S-curves for the loss and recovery phases:
+     *  - Days 0–4:  smooth S-curve drop to −5 % (best-case nadir)
+     *  - Days 4–10: smooth S-curve recovery back to birth weight
+     *  - Day 10+:   steady gain of ~28 g/day (linear – intentionally straight)
      */
     private fun optimalWeightAt(daysSinceBirth: Double): Double {
         if (birthWeight <= 0) return 0.0
         return when {
-            daysSinceBirth < 0 -> birthWeight
-            daysSinceBirth <= 4.0 -> birthWeight * (1.0 - 0.0125 * daysSinceBirth) // −1.25 %/day → max −5 %
-            daysSinceBirth <= 10.0 -> birthWeight * (0.95 + 0.05 * (daysSinceBirth - 4.0) / 6.0)
+            daysSinceBirth < 0    -> birthWeight
+            daysSinceBirth <= 4.0 -> birthWeight * (1.0 - 0.05 * smoothstep(daysSinceBirth / 4.0))
+            daysSinceBirth <= 10.0 -> {
+                val s = smoothstep((daysSinceBirth - 4.0) / 6.0)
+                birthWeight * (0.95 + 0.05 * s)
+            }
             else -> birthWeight + 28.0 * (daysSinceBirth - 10.0)
         }
     }
 
     /**
-     * Returns the optimal daily weight change (g/day), i.e. the derivative of [optimalWeightAt]:
-     *  - Days 0–4:   −birthWeight × 1.25 % / day
-     *  - Days 4–10:  +birthWeight × 5 % / 6 days (recovery)
+     * Returns the optimal daily weight change (g/day), i.e. the analytical
+     * derivative of [optimalWeightAt]:
+     *  - Days 0–4:   −birthWeight × 0.05 × 6t(1−t) / 4
+     *  - Days 4–10:  +birthWeight × 0.05 × 6u(1−u) / 6   (u=(d−4)/6)
      *  - Day 10+:    +28 g/day
      */
     private fun optimalDiffAt(daysSinceBirth: Double): Double {
         if (birthWeight <= 0) return 0.0
         return when {
-            daysSinceBirth <= 4.0 -> -birthWeight * 0.0125
-            daysSinceBirth <= 10.0 -> birthWeight * 0.05 / 6.0
+            daysSinceBirth <= 0.0  -> 0.0
+            daysSinceBirth <= 4.0  -> {
+                val t = daysSinceBirth / 4.0
+                -birthWeight * 0.05 * 6.0 * t * (1.0 - t) / 4.0
+            }
+            daysSinceBirth <= 10.0 -> {
+                val t = (daysSinceBirth - 4.0) / 6.0
+                birthWeight * 0.05 * 6.0 * t * (1.0 - t) / 6.0
+            }
             else -> 28.0
         }
     }

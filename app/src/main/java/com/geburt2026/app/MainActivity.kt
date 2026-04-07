@@ -3558,10 +3558,14 @@ class MainActivity : AppCompatActivity() {
                 "🔵 Babygeschrei-Stress\n" +
                 "Der durch das Schreien des Babys ausgelöste Stress. " +
                 "Der Höhepunkt liegt typischerweise in Woche 4–6 (sog. „Schrei-Gipfel").\n\n" +
-                "🟠 Familien-Stress\n" +
+                "🟠 Familien-Stress (Geschwister)\n" +
                 "Der allgemeine Stresslevel der Familie, der neben dem Babyschreien " +
                 "auch Geschwistereifersucht, Logistik (Kita/Schule), Schlafmangel und " +
                 "die besondere Situation mit älteren Kindern berücksichtigt.\n\n" +
+                "🟢 Typisch (ohne Geschwister)\n" +
+                "Referenz-Kurve: So sieht der Familien-Stress normalerweise aus – " +
+                "ohne Geschwisterkinder und für jüngere Eltern. Zeigt, wo der Stress " +
+                "\"normalerweise\" liegt, damit ihr euren eigenen Wert einordnen könnt.\n\n" +
                 "🟢 Grüner Bereich (0–40 %): gut – weiter so!\n" +
                 "🟡 Gelber Bereich (40–70 %): erhöht – auf Pausen achten.\n" +
                 "🔴 Roter Bereich (70–100 %): hoch – Unterstützung einplanen.\n\n" +

@@ -72,6 +72,16 @@ class StressChartView @JvmOverloads constructor(
         pathEffect = DashPathEffect(floatArrayOf(16f, 8f), 0f)
     }
 
+    /** Dotted olive/dark-green line – typical newborn stress reference (no siblings). */
+    private val typicalLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#558B2F")
+        strokeWidth = 2.5f
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+        pathEffect = DashPathEffect(floatArrayOf(5f, 7f), 0f)
+    }
+
     /** Thin dashed purple vertical line marking today. */
     private val todayLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#7B1FA2")
@@ -212,6 +222,62 @@ class StressChartView @JvmOverloads constructor(
         return (base + siblingBonus).coerceIn(0.0, 100.0)
     }
 
+    /**
+     * Typical family stress level (0–100) for a reference household with
+     * **no older siblings** and younger parents – serves as a baseline so
+     * the user can see where "normal" newborn stress sits.
+     *
+     * This equals the *base* component of [familyStressAt] without the
+     * sibling/older-parent bonus, representing a typical first-time-parent
+     * couple with just the newborn.
+     */
+    private fun typicalStressAt(weeksSinceBirth: Double): Double {
+        return when {
+            weeksSinceBirth < -6.0 -> 22.0
+            weeksSinceBirth < -4.0 -> 22.0 + (weeksSinceBirth + 6.0) * (6.0 / 2.0)
+            weeksSinceBirth < -2.0 -> 28.0 + (weeksSinceBirth + 4.0) * (7.0 / 2.0)
+            weeksSinceBirth < 0.0  -> 35.0 + (weeksSinceBirth + 2.0) * (17.0 / 2.0)
+            weeksSinceBirth < 1.0  -> 52.0 + weeksSinceBirth * 10.0
+            weeksSinceBirth < 4.0  -> 62.0 + (weeksSinceBirth - 1.0) * (3.0 / 3.0)
+            weeksSinceBirth < 6.0  -> 65.0
+            weeksSinceBirth < 8.0  -> 65.0 - (weeksSinceBirth - 6.0) * 5.0
+            weeksSinceBirth < 10.0 -> 55.0 - (weeksSinceBirth - 8.0) * 7.0
+            weeksSinceBirth < 13.0 -> 41.0 - (weeksSinceBirth - 10.0) * (11.0 / 3.0)
+            else                   -> 30.0
+        }.coerceIn(0.0, 100.0)
+    }
+
+    // ── Path helpers ───────────────────────────────────────────────────────────
+
+    /**
+     * Builds a smooth Catmull-Rom spline through the provided screen-space
+     * waypoints using cubic Bézier segments.  Each segment uses the adjacent
+     * neighbours as "velocity guides" so that the curve passes through every
+     * waypoint with a continuous tangent – no sharp corners at transitions.
+     *
+     * Control-point formula (scaled Catmull-Rom → cubic Bézier):
+     *   CP₁ = P_i  + (P_{i+1} − P_{i−1}) / 6
+     *   CP₂ = P_{i+1} − (P_{i+2} − P_i) / 6
+     */
+    private fun catmullRomPath(pts: List<PointF>): Path {
+        val path = Path()
+        if (pts.isEmpty()) return path
+        path.moveTo(pts[0].x, pts[0].y)
+        if (pts.size < 2) return path
+        for (i in 0 until pts.size - 1) {
+            val p0 = if (i > 0) pts[i - 1] else pts[0]
+            val p1 = pts[i]
+            val p2 = pts[i + 1]
+            val p3 = if (i < pts.size - 2) pts[i + 2] else pts[i + 1]
+            val cp1x = p1.x + (p2.x - p0.x) / 6f
+            val cp1y = p1.y + (p2.y - p0.y) / 6f
+            val cp2x = p2.x - (p3.x - p1.x) / 6f
+            val cp2y = p2.y - (p3.y - p1.y) / 6f
+            path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
+        }
+        return path
+    }
+
     // ── Drawing ────────────────────────────────────────────────────────────────
 
     override fun onDraw(canvas: Canvas) {
@@ -223,7 +289,7 @@ class StressChartView @JvmOverloads constructor(
         // Layout margins
         val padL = 56f   // room for y-axis percentage labels
         val padR = 12f
-        val padT = 56f   // room for two legend rows
+        val padT = 80f   // room for three legend rows (curves × 2 + zones)
         val padB = 42f   // room for x-axis date labels
 
         val chartL = padL
@@ -292,37 +358,38 @@ class StressChartView @JvmOverloads constructor(
         // ── Chart border ──────────────────────────────────────────────────────
         canvas.drawRect(chartL, chartT, chartR, chartB, axisPaint)
 
-        // ── Family-stress curve (orange dashed) ───────────────────────────────
-        val familyPath = Path()
-        val steps = 200
-        for (i in 0..steps) {
-            val ts = startTime + i.toLong() * (endTime - startTime) / steps
-            val weeks = (ts - refTime).toDouble() / (7.0 * msPerDay)
-            val x = timeToX(ts)
-            val y = stressToY(familyStressAt(weeks))
-            if (i == 0) familyPath.moveTo(x, y) else familyPath.lineTo(x, y)
+        // Helper: build a smooth Catmull-Rom path from a list of key weeks
+        fun stressPath(weekPoints: List<Double>, stressFn: (Double) -> Double): Path {
+            val pts = weekPoints.map { wk ->
+                val ts = refTime + (wk * 7.0 * msPerDay).toLong()
+                PointF(timeToX(ts), stressToY(stressFn(wk)))
+            }
+            return catmullRomPath(pts)
         }
-        canvas.drawPath(familyPath, familyLinePaint)
+
+        // Key waypoints for each curve (piecewise-segment boundaries + tail anchors)
+        val cryingWeeks  = listOf(-7.0, -6.0, -3.0, 0.0, 2.0, 4.0, 6.5, 8.0, 10.0, 13.0, 14.0)
+        val familyWeeks  = listOf(-7.0, -6.0, -4.0, -2.0, 0.0, 1.0, 4.0, 6.0, 8.0, 10.0, 13.0, 14.0)
+        val typicalWeeks = listOf(-7.0, -6.0, -4.0, -2.0, 0.0, 1.0, 4.0, 6.0, 8.0, 10.0, 13.0, 14.0)
+
+        // ── Typical-stress reference curve (olive dotted) ─────────────────────
+        canvas.drawPath(stressPath(typicalWeeks, ::typicalStressAt), typicalLinePaint)
+
+        // ── Family-stress curve (orange dashed) ───────────────────────────────
+        canvas.drawPath(stressPath(familyWeeks, ::familyStressAt), familyLinePaint)
 
         // ── Crying-stress curve (blue solid) ──────────────────────────────────
-        val cryingPath = Path()
-        for (i in 0..steps) {
-            val ts = startTime + i.toLong() * (endTime - startTime) / steps
-            val weeks = (ts - refTime).toDouble() / (7.0 * msPerDay)
-            val x = timeToX(ts)
-            val y = stressToY(cryingStressAt(weeks))
-            if (i == 0) cryingPath.moveTo(x, y) else cryingPath.lineTo(x, y)
-        }
-        canvas.drawPath(cryingPath, cryingLinePaint)
+        canvas.drawPath(stressPath(cryingWeeks, ::cryingStressAt), cryingLinePaint)
 
         // ── Legend ─────────────────────────────────────────────────────────────
         val legendLineLen = 30f
         val legendBoxSz   = 14f
         val row1Y = 20f
         val row2Y = 44f
+        val row3Y = 68f
         var lx = chartL
 
-        // Row 1 – curves
+        // Row 1 – crying + family stress curves
         val legendCryingPaint = Paint(cryingLinePaint).apply { pathEffect = null }
         canvas.drawLine(lx, row1Y, lx + legendLineLen, row1Y, legendCryingPaint)
         canvas.drawText("Babygeschrei-Stress", lx + legendLineLen + 5f, row1Y + legendTextPaint.textSize / 3f, legendTextPaint)
@@ -331,7 +398,12 @@ class StressChartView @JvmOverloads constructor(
         canvas.drawLine(lx, row1Y, lx + legendLineLen, row1Y, familyLinePaint)
         canvas.drawText("Familien-Stress (Geschwister)", lx + legendLineLen + 5f, row1Y + legendTextPaint.textSize / 3f, legendTextPaint)
 
-        // Row 2 – zones
+        // Row 2 – typical reference curve
+        lx = chartL
+        canvas.drawLine(lx, row2Y, lx + legendLineLen, row2Y, typicalLinePaint)
+        canvas.drawText("Typisch (ohne Geschwister) – Referenz", lx + legendLineLen + 5f, row2Y + legendTextPaint.textSize / 3f, legendTextPaint)
+
+        // Row 3 – zones
         lx = chartL
         val zoneStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -339,20 +411,20 @@ class StressChartView @JvmOverloads constructor(
         }
         fun drawZoneBox(x: Float, fillColor: Int, strokeColor: String) {
             val boxPaint = Paint().apply { color = fillColor; style = Paint.Style.FILL }
-            canvas.drawRect(x, row2Y - legendBoxSz, x + legendBoxSz, row2Y, boxPaint)
+            canvas.drawRect(x, row3Y - legendBoxSz, x + legendBoxSz, row3Y, boxPaint)
             zoneStrokePaint.color = Color.parseColor(strokeColor)
-            canvas.drawRect(x, row2Y - legendBoxSz, x + legendBoxSz, row2Y, zoneStrokePaint)
+            canvas.drawRect(x, row3Y - legendBoxSz, x + legendBoxSz, row3Y, zoneStrokePaint)
         }
 
         drawZoneBox(lx, Color.parseColor("#4488C34A"), "#4CAF50")
-        canvas.drawText("Gut (0–40%)", lx + legendBoxSz + 4f, row2Y - 1f, legendTextPaint)
+        canvas.drawText("Gut (0–40%)", lx + legendBoxSz + 4f, row3Y - 1f, legendTextPaint)
         lx += legendBoxSz + 4f + legendTextPaint.measureText("Gut (0–40%)") + 14f
 
         drawZoneBox(lx, Color.parseColor("#44FFC107"), "#FFC107")
-        canvas.drawText("Erhöht (40–70%)", lx + legendBoxSz + 4f, row2Y - 1f, legendTextPaint)
+        canvas.drawText("Erhöht (40–70%)", lx + legendBoxSz + 4f, row3Y - 1f, legendTextPaint)
         lx += legendBoxSz + 4f + legendTextPaint.measureText("Erhöht (40–70%)") + 14f
 
         drawZoneBox(lx, Color.parseColor("#44F44336"), "#F44336")
-        canvas.drawText("Hoch (70–100%)", lx + legendBoxSz + 4f, row2Y - 1f, legendTextPaint)
+        canvas.drawText("Hoch (70–100%)", lx + legendBoxSz + 4f, row3Y - 1f, legendTextPaint)
     }
 }
